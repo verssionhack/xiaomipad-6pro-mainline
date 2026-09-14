@@ -9,14 +9,24 @@ requires Binder IPC, binderfs and a handful of generic kernel features:
 | Requirement | Kernel status | Source |
 |---|---|---|
 | Binder IPC / binderfs | ✅ Built in | `device/configs/liuqin-waydroid.config` |
+| IPv4 and IPv6 policy routing (FIB rules) | ✅ Built in | `device/configs/liuqin-waydroid.config` |
 | PSI (`/proc/pressure`) | ✅ Built in | `device/configs/liuqin-desktop.config` |
 | memfd, network namespaces, cgroup freezer | ✅ Built in | Base configuration |
 | veth | ✅ Module | Installed with the kernel modules |
 
-`device/configs/liuqin-waydroid.config` only adds the Binder symbols; the
-result is locked by `kernel/source.json` (`config_fragments` and
+`device/configs/liuqin-waydroid.config` adds the Binder and routing symbols;
+the result is locked by `kernel/source.json` (`config_fragments` and
 `config_sha256`). After changing the fragment, regenerate and update
 `config_sha256` with the same toolchain.
+
+Android's `netd` installs the container's default route and DNS through policy
+routing (`ip rule`), so the kernel must provide the advanced router and
+multiple routing tables for **both** IPv4 and IPv6. If either rule set is
+missing, `netd` aborts `RouteController` initialisation and the container comes
+up with only its on-link `/24` route and no internet. These options change the
+layout of `struct net`, so the kernel modules must be rebuilt together with the
+image (`make Image modules`) and reinstalled; flashing a new `Image` alone
+leaves the old modules with stale structure offsets.
 
 ## Installation
 

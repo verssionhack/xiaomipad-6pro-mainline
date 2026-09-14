@@ -9,13 +9,21 @@
 | 需求 | 本内核状态 | 来源 |
 |---|---|---|
 | Binder IPC / binderfs | ✅ 内建 | `device/configs/liuqin-waydroid.config` |
+| IPv4 与 IPv6 策略路由（FIB rules） | ✅ 内建 | `device/configs/liuqin-waydroid.config` |
 | PSI（`/proc/pressure`） | ✅ 内建 | `device/configs/liuqin-desktop.config` |
 | memfd、network namespace、cgroup freezer | ✅ 内建 | 基线配置 |
 | veth | ✅ 模块 | 已随内核模块安装 |
 
-`device/configs/liuqin-waydroid.config` 只新增 Binder 相关项；其内容由
+`device/configs/liuqin-waydroid.config` 新增 Binder 与路由相关项；其内容由
 `kernel/source.json` 锁定（`config_fragments` 与 `config_sha256`）。改动该
 片段后必须用同一工具链重新生成并更新 `config_sha256`。
+
+Android 的 `netd` 依靠策略路由（`ip rule`）为容器安装默认路由与 DNS，因此
+内核必须同时提供 IPv4 与 IPv6 的高级路由和多路由表。任一缺失时 `netd` 的
+`RouteController` 初始化会失败，容器只剩同网段 `/24` 路由、无法上网。这些
+选项会改变 `struct net` 的内存布局，所以必须**连同模块一起重编**
+（`make Image modules`）并重新安装；只刷新的 `Image` 会让旧模块用到过期的
+结构偏移量。
 
 ## 安装
 

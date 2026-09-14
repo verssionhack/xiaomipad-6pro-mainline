@@ -100,6 +100,8 @@ and device trees; other batches, capacities and accessory combinations are not i
 Ubuntu packages are managed through APT. Update instructions for the project kernel and device components will accompany each installation release.
 Do not mix boot images and system components from different releases.
 
+To run Android applications inside Ubuntu, Waydroid is supported; the required kernel configuration is built in. See [Waydroid support](docs/WAYDROID.md).
+
 Report problems through GitHub Issues with the device model, system version, reproduction steps and relevant logs.
 Remove passwords, network credentials and personal information before sharing logs.
 The accounts listed above are also available for usage discussions.

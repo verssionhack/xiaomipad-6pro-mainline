@@ -26,7 +26,7 @@ out_dir=${OUT_DIR:-"$project_root/out/liuqin-debs"}
 version=${LIUQIN_DEB_VERSION:-0.1}
 maintainer='yzddmr6 <46088090+yzddmr6@users.noreply.github.com>'
 
-firmware_tree=${FIRMWARE_TREE:-"$project_root/out/firmware/firmware-tree"}
+firmware_tree=${FIRMWARE_TREE:-"$project_root/device/firmware"}
 firmware_manifest_sha256=${FIRMWARE_MANIFEST_SHA256:-012c413e0a5d5c3c14631fbdfe50da5c51e95ffc1ae431b8d93f776538b65ba2}
 overlay=${GNOME_OVERLAY:-"$project_root/device/gnome-overlay"}
 ubuntu_desktop_root=${UBUNTU_DESKTOP_ROOT:-"$project_root/tools/local/ubuntu-desktop-26.04-arm64/rootfs"}

@@ -2,11 +2,13 @@
 
 [English](INSTALL-TESTING.md)
 
-首次安装和首次启动已在已知的 256 GB 布局完成真机验证。本项目仍属于实验性设备移植，安装时请保持有人在场，并准备恢复条件。
+首次安装和首次启动已在 256 GB 机型完成真机验证；128 GB 与 512 GB 变体按
+[安装指南](FLASHING.zh-CN.md)的规则放行但未逐一真机验证。本项目仍属于实验性设备移植，
+安装时请保持有人在场，并准备恢复条件。
 
 ## 准备
 
-- Xiaomi Pad 6 Pro（liuqin），256 GB 存储布局；其他容量会被拒绝。
+- Xiaomi Pad 6 Pro（liuqin）；userdata 分区不小于 16 GiB，自定义分区布局会被拒绝。
 - Bootloader 已解锁，A 槽处于活动状态，平板进入 Fastboot，电量至少 30%。
 - Linux 主机、Python 3.11 或更新版本、Android platform-tools，以及正常的 USB 网络支持。
 - 个人文件已备份到平板以外；安装会清空整个 userdata，安装器不会备份个人文件。
@@ -22,7 +24,8 @@ if [ ! -f rootfs.tar.gz ]; then
 fi
 ```
 
-确认允许清空数据后安装；安装器会在访问设备前自动校验镜像，无需重复校验：
+安装器会在访问设备前自动校验镜像，无需重复校验。开始安装前需交互输入
+`YES` 确认清空数据（脚本或无交互环境显式加 `--yes`）：
 
 ```sh
 python3 install.py --bundle . --serial DEVICE_SERIAL \

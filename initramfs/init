@@ -23,9 +23,10 @@ log() {
 # The normal development image remains fail-closed and RAM-only.  A separately
 # built persistent image contains /etc/liuqin-storage-mode with the single word
 # "persistent".  Even in that image we begin by making every UFS block device
-# read-only.  The exact userdata partition is opened only after its immutable
-# geometry, filesystem label and marker file have all been checked while it is
-# mounted read-only.
+# read-only.  The userdata partition is opened only after its identity
+# (PARTNAME, filesystem label, marker file and root contract) has been checked
+# while it is mounted read-only.  Capacity variants move userdata inside the
+# GPT, so the partition is resolved by name, not by a pinned number.
 storage_mode=readonly
 storage_mode_file=/etc/liuqin-storage-mode
 if [ -r "$storage_mode_file" ]; then
@@ -77,7 +78,8 @@ storage_sys_block=${LIUQIN_STORAGE_SYS_BLOCK:-/sys/class/block}
 storage_mounts=${LIUQIN_STORAGE_MOUNTS:-/proc/mounts}
 storage_probe_root=${LIUQIN_STORAGE_PROBE_ROOT:-/mnt/persistent-root}
 storage_newroot=${LIUQIN_STORAGE_NEWROOT:-/newroot}
-storage_target=$storage_dev_root/sda35
+storage_target_name=
+storage_target=
 storage_parent=$storage_dev_root/sda
 storage_marker=etc/liuqin-persistent-root
 storage_marker_sha256=0d354b25a425dcc17da2c7a8bbdaae09274cecdb1f137c70630ebe5634fa9a48
@@ -149,18 +151,41 @@ storage_source_is_mounted() {
 	return 1
 }
 
+# userdata carries the only writable persistent root.  Resolve it by PARTNAME
+# rather than a pinned partition number: liuqin capacity variants share the
+# first UFS LUN but not the exact GPT offsets.  Anything ambiguous (missing,
+# duplicated, or on another LUN) fails closed.
+storage_resolve_target() {
+	storage_resolved_name=
+	for storage_uevent in "$storage_sys_block"/sd*/uevent; do
+		[ -r "$storage_uevent" ] || continue
+		[ "$(storage_uevent_value PARTNAME "$storage_uevent" 2>/dev/null || true)" = userdata ] || continue
+		storage_candidate=${storage_uevent%/uevent}
+		storage_candidate=${storage_candidate##*/}
+		case $storage_candidate in
+		sda[0-9]*) ;;
+		*) return 1 ;;
+		esac
+		[ -z "$storage_resolved_name" ] || return 1
+		storage_resolved_name=$storage_candidate
+	done
+	[ -n "$storage_resolved_name" ] || return 1
+	storage_target_name=$storage_resolved_name
+	storage_target=$storage_dev_root/$storage_target_name
+	return 0
+}
+
 storage_identity_ok() {
+	storage_resolve_target || return 1
 	storage_path_is_block "$storage_parent" || return 1
 	storage_path_is_block "$storage_target" || return 1
 	[ "$("$BB" readlink -f "$storage_parent" 2>/dev/null || true)" = "$storage_parent" ] || return 1
 	[ "$("$BB" readlink -f "$storage_target" 2>/dev/null || true)" = "$storage_target" ] || return 1
 
-	[ "$(storage_value "$storage_sys_block/sda/size" 2>/dev/null || true)" = 493854720 ] || return 1
 	[ "$(storage_value "$storage_sys_block/sda/queue/logical_block_size" 2>/dev/null || true)" = 4096 ] || return 1
-	[ "$(storage_value "$storage_sys_block/sda35/partition" 2>/dev/null || true)" = 35 ] || return 1
-	[ "$(storage_value "$storage_sys_block/sda35/start" 2>/dev/null || true)" = 22065152 ] || return 1
-	[ "$(storage_value "$storage_sys_block/sda35/size" 2>/dev/null || true)" = 471789528 ] || return 1
-	[ "$(storage_uevent_value PARTNAME "$storage_sys_block/sda35/uevent" 2>/dev/null || true)" = userdata ] || return 1
+	storage_target_size=$(storage_value "$storage_sys_block/$storage_target_name/size" 2>/dev/null || true)
+	case $storage_target_size in ''|*[!0-9]*) return 1 ;; esac
+	[ "$storage_target_size" -ge 33554432 ] || return 1
 
 	storage_label_path=$("$BB" findfs LABEL=LIUQIN_ROOT 2>/dev/null || true)
 	[ -n "$storage_label_path" ] || return 1
@@ -533,7 +558,7 @@ storage_snapshot_sd_nodes() {
 	storage_snapshot_has_target=false
 	for storage_block in $storage_sd_nodes_snapshot; do
 		[ "$storage_block" != sda ] || storage_snapshot_has_parent=true
-		[ "$storage_block" != sda35 ] || storage_snapshot_has_target=true
+		[ "$storage_block" != "$storage_target_name" ] || storage_snapshot_has_target=true
 	done
 	[ "$storage_snapshot_has_parent" = true ] && [ "$storage_snapshot_has_target" = true ] || return 1
 	storage_sd_nodes_snapshot_taken=true
@@ -592,7 +617,7 @@ storage_snapshot_persistent_ok() {
 	storage_sd_nodes_current=$(storage_collect_sd_nodes "$storage_nodes_root") || return 1
 	[ "$storage_sd_nodes_current" = "$storage_sd_nodes_snapshot" ] || return 1
 	storage_check_parent=$storage_nodes_root/sda
-	storage_check_target=$storage_nodes_root/sda35
+	storage_check_target=$storage_nodes_root/$storage_target_name
 	storage_path_is_block "$storage_check_parent" || return 1
 	storage_path_is_block "$storage_check_target" || return 1
 	[ "$("$BB" readlink -f "$storage_check_parent" 2>/dev/null || true)" = "$storage_check_parent" ] || return 1
@@ -600,7 +625,7 @@ storage_snapshot_persistent_ok() {
 	[ "$("$BB" blockdev --getro "$storage_check_parent" 2>/dev/null || true)" = 0 ] || return 1
 	[ "$("$BB" blockdev --getro "$storage_check_target" 2>/dev/null || true)" = 0 ] || return 1
 	for storage_block in $storage_sd_nodes_snapshot; do
-		case $storage_block in sda|sda35) continue ;; esac
+		case $storage_block in sda|"$storage_target_name") continue ;; esac
 		[ "$("$BB" blockdev --getro "$storage_nodes_root/$storage_block" 2>/dev/null || true)" = 1 ] || return 1
 	done
 	return 0
@@ -926,6 +951,27 @@ for udc_path in /sys/class/udc/*; do
 	udc_name=$(basename "$udc_path")
 	break
 done
+
+# OTG dual-role wiring takes the port role from UCSI on the ADSP, which is not
+# running in this RAM image, so no role arrives and no UDC registers here.
+# The rescue channel is always the peripheral side; claim that role from the
+# switch explicitly.  UCSI takes the port back over after switch_root, so an
+# attached OTG host device still gets host mode in the booted desktop.
+if [ -z "$udc_name" ]; then
+	for role_path in /sys/class/usb_role/*/role; do
+		[ -w "$role_path" ] || continue
+		echo device >"$role_path" 2>/dev/null || true
+	done
+	for attempt in 1 2 3 4 5; do
+		for udc_path in /sys/class/udc/*; do
+			[ -e "$udc_path" ] || continue
+			udc_name=$(basename "$udc_path")
+			break
+		done
+		[ -n "$udc_name" ] && break
+		sleep 1
+	done
+fi
 
 start_stage1_telnet() {
 	if [ "$ufs_safe" = true ]; then

@@ -1,11 +1,14 @@
 # Installation Steps
 
-Initial installation and first boot have been tested on the known 256 GB layout.
+Initial installation and first boot have been tested on a 256 GB unit. The
+128 GB and 512 GB variants are admitted by the rules in the
+[installation guide](FLASHING.md) but have not been tested on real hardware.
 This remains an experimental device port. Keep the tablet attended and prepare a recovery plan.
 
 ## Requirements
 
-- Xiaomi Pad 6 Pro (liuqin), 256 GB layout. Other capacities are rejected.
+- Xiaomi Pad 6 Pro (liuqin) with a userdata partition of at least 16 GiB.
+  Modified partition layouts are rejected.
 - Unlocked bootloader, slot A active, and the device in Fastboot mode.
 - Battery at least 30 percent charged.
 - Linux host with Python 3.11 or newer, Android platform-tools and USB networking.
@@ -22,8 +25,9 @@ if [ ! -f rootfs.tar.gz ]; then
 fi
 ```
 
-To install after agreeing to erase userdata, run the following. Images are
-verified automatically before any device access:
+Images are verified automatically before any device access. Before the
+installation starts, confirm the erasure interactively by typing `YES`
+(scripts and non-interactive shells pass `--yes` explicitly):
 
 ```sh
 python3 install.py --bundle . --serial DEVICE_SERIAL \

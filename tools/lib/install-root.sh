@@ -11,14 +11,25 @@ case $rescue in ''|ENABLE-USB-RESCUE) ;; *) die 'unsupported rescue option' ;; e
 [ "$(cat /etc/liuqin-installer 2>/dev/null)" = liuqin ] || die 'not the installer RAM image'
 ln -sf /proc/self/fd/0 /dev/stdin
 # The host checks Fastboot product/serial; boot_id binds this operation to it.
-[ "$(cat /sys/class/block/sda/size)" = 493854720 ] || die 'unsupported storage capacity'
-[ "$(cat /sys/class/block/sda35/start)" = 22065152 ] || die 'userdata start mismatch'
-[ "$(cat /sys/class/block/sda35/size)" = 471789528 ] || die 'userdata size mismatch'
-grep -q '^PARTNAME=userdata$' /sys/class/block/sda35/uevent || die 'not userdata'
-device_number=$(cat /sys/class/block/sda35/dev)
+# The partition number and offsets are not pinned: liuqin capacity variants
+# place userdata differently.  PARTNAME (through the installer-created
+# by-partlabel link) is the identity; a 16 GiB floor rejects wrong targets.
+userdata=$(/bin/busybox readlink -f /dev/disk/by-partlabel/userdata 2>/dev/null || true)
+[ -n "$userdata" ] && [ -b "$userdata" ] ||
+	die 'userdata partition is missing —— 该设备不是受支持的小米平板 6 Pro（liuqin）'
+node=${userdata##*/}
+grep -q '^PARTNAME=userdata$' "/sys/class/block/$node/uevent" || die 'not userdata'
+size=$(cat "/sys/class/block/$node/size")
+case $size in ''|*[!0-9]*) die 'userdata size is unavailable' ;; esac
+[ "$size" -ge 33554432 ] || die 'userdata is smaller than 16 GiB —— 不支持该设备'
+parent_path=$(/bin/busybox readlink -f "/sys/class/block/$node/.." 2>/dev/null || true)
+[ -n "$parent_path" ] || die 'userdata parent disk is unavailable'
+parent=/dev/${parent_path##*/}
+[ -b "$parent" ] || die 'userdata parent disk is missing'
+device_number=$(cat "/sys/class/block/$node/dev")
 awk -v device="$device_number" '$3 == device {found=1} END {exit !found}' /proc/self/mountinfo &&
 	die 'userdata is mounted (including through a device alias)'
-[ "$(/bin/busybox blockdev --getro /dev/sda35)" = 1 ] || die 'userdata is not initially read-only'
+[ "$(/bin/busybox blockdev --getro "$userdata")" = 1 ] || die 'userdata is not initially read-only'
 battery=
 for supply in /sys/class/power_supply/*; do
 	[ "$(cat "$supply/type" 2>/dev/null)" = Battery ] || continue
@@ -45,8 +56,8 @@ cleanup() {
 		mounted=false
 	fi
 	if [ "$opened" = true ]; then
-		/bin/busybox blockdev --setro /dev/sda35
-		/bin/busybox blockdev --setro /dev/sda
+		/bin/busybox blockdev --setro "$userdata"
+		/bin/busybox blockdev --setro "$parent"
 		opened=false
 	fi
 	if [ "$persist_mounted" = true ]; then
@@ -75,11 +86,11 @@ for item in wlan/wlan_mac.bin bluetooth/.bt_nv.bin audio/crus_calr.bin; do
 	[ -f "/run/persist/$item" ] || die 'factory data is incomplete'
 done
 [ -d /run/persist/sensors/registry/registry ] || die 'factory sensor registry is missing'
-/bin/busybox blockdev --setrw /dev/sda
+/bin/busybox blockdev --setrw "$parent"
 opened=true
-/bin/busybox blockdev --setrw /dev/sda35
-/usr/sbin/mkfs.ext4 -F -L LIUQIN_ROOT -m 0 /dev/sda35
-mount -t ext4 /dev/sda35 /mnt/install
+/bin/busybox blockdev --setrw "$userdata"
+/usr/sbin/mkfs.ext4 -F -L LIUQIN_ROOT -m 0 "$userdata"
+mount -t ext4 "$userdata" /mnt/install
 mounted=true
 mkdir /mnt/install/native-root
 /usr/bin/tar -xzf "$archive" -C /mnt/install/native-root \

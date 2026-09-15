@@ -15,12 +15,18 @@ fail() {
 [ "$($BB stat -c '%a %u %g' "$marker" 2>/dev/null)" = '644 0 0' ] || fail 'root marker metadata invalid'
 [ "$($BB sha256sum "$marker" | $BB cut -d' ' -f1)" = "$marker_sha" ] || fail 'root marker content invalid'
 
+root_source=
 roots=0
 while IFS=' ' read -r source target fstype options _; do
 	[ "$target" = / ] || continue
 	roots=$((roots + 1))
-	[ "$source:$fstype" = /dev/sda35:ext4 ] || fail 'unexpected root source'
+	# The initramfs already proved PARTNAME=userdata before switch_root; the
+	# exact partition number varies with the capacity variant, so here the rw
+	# pair is derived from the actual root mount on the first UFS LUN.
+	case $source in /dev/sda[0-9]*) ;; *) fail 'unexpected root source' ;; esac
+	[ "$fstype" = ext4 ] || fail 'unexpected root filesystem'
 	case ,$options, in *,rw,*) ;; *) fail 'root is not read-write' ;; esac
+	root_source=$source
 done </proc/mounts
 [ "$roots" = 1 ] || fail 'root mount is missing or duplicated'
 
@@ -29,7 +35,7 @@ for node in /dev/sd*; do
 	[ -b "$node" ] || continue
 	total=$((total + 1))
 	case $node in
-	/dev/sda|/dev/sda35)
+	/dev/sda|"$root_source")
 		[ "$($BB blockdev --getro "$node" 2>/dev/null)" = 0 ] || fail "$node is unexpectedly read-only"
 		;;
 	*)

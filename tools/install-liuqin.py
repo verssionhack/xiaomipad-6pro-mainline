@@ -65,6 +65,7 @@ def main():
     parser.add_argument('--device-address', default='192.168.7.2')
     parser.add_argument('--backup', type=Path)
     parser.add_argument('--erase-userdata', action='store_true')
+    parser.add_argument('--yes', action='store_true', help='Skip the interactive data-erasure confirmation')
     parser.add_argument('--allow-unverified', action='store_true', help='Explicitly test an offline-only bundle')
     parser.add_argument('--enable-rescue', action='store_true',
                         help='Enable unauthenticated root rescue access after installation (trusted USB only)')
@@ -75,12 +76,13 @@ def main():
         parser.error('wrong device bundle')
     for name in ('boot.img', 'installer.img', 'rootfs.tar.gz'):
         if sha(bundle / name) != manifest['files'][name]:
-            parser.error('bundle checksum mismatch: ' + name)
+            parser.error('bundle checksum mismatch: ' + name + ' —— 包文件损坏或不完整，请重新下载')
     if args.check:
         print('Local bundle checksums verified; no device access')
         return
     if manifest['status'] != 'DEVICE_TESTED' and not args.allow_unverified:
-        parser.error('bundle has not passed device testing; use --allow-unverified only for attended tests')
+        parser.error('bundle has not passed device testing; use --allow-unverified only for attended tests'
+                     ' —— 该包未通过真机验证，请勿用于正式安装')
     if not all((args.serial, args.backup, args.erase_userdata)):
         parser.error('--serial, --backup and --erase-userdata are required')
     if args.backup.exists():
@@ -99,10 +101,12 @@ def main():
 
     for name, value in (('product', 'liuqin'), ('unlocked', 'yes')):
         if not re.search(r'\b' + name + r':\s*' + value + r'\b', fastboot('getvar', name)):
-            parser.error('Fastboot device check failed: ' + name)
+            parser.error('Fastboot device check failed: ' + name +
+                         ' —— 请确认设备是小米平板 6 Pro（liuqin）且已解锁 Bootloader')
     # The current boot contract supports slot A only; never switch slots implicitly.
     if not re.search(r'current-slot:\s*a\b', fastboot('getvar', 'current-slot')):
-        parser.error('slot A must be active before this installation')
+        parser.error('slot A must be active before this installation'
+                     ' —— 请先执行: fastboot --set-active=a')
     def partition_size(name):
         match = re.search(r'partition-size:' + re.escape(name) + r':\s*(0x[0-9a-fA-F]+)',
                           fastboot('getvar', 'partition-size:' + name))
@@ -110,10 +114,20 @@ def main():
             raise RuntimeError('Cannot determine partition size: ' + name)
         return int(match[1], 16)
 
-    if partition_size('userdata') != 471789528 * 512:
-        parser.error('unsupported userdata size; only the known 256 GB layout is admitted')
+    if partition_size('userdata') < 16 * 1024**3:
+        parser.error('userdata is smaller than 16 GiB; only Xiaomi Pad 6 Pro (liuqin) is supported'
+                     ' —— 请确认设备为小米平板 6 Pro（liuqin），不要用于其他机型')
     if max((bundle / name).stat().st_size for name in ('boot.img', 'installer.img')) > partition_size('boot_a'):
-        parser.error('boot image exceeds the reported boot partition size')
+        parser.error('boot image exceeds the reported boot partition size'
+                     ' —— boot 镜像大于 boot 分区，包与设备不匹配')
+    if not args.yes:
+        if not sys.stdin.isatty():
+            parser.error('data erasure needs an interactive confirmation; pass --yes to skip it'
+                         ' —— 非交互环境请显式加 --yes 确认清空 userdata')
+        print(f'About to ERASE userdata on tablet {args.serial} and install Ubuntu.')
+        print(f'即将清空平板 {args.serial} 的全部用户数据（Android 将被移除）并安装 Ubuntu。')
+        if input('Type YES to continue / 输入 YES 继续: ') != 'YES':
+            parser.error('data erasure was not confirmed —— 未确认，已取消')
     server = None
     try:
         print('Booting the RAM installer...', flush=True)
@@ -136,10 +150,12 @@ def main():
         cmdline = shlex.split(remote('cat /proc/cmdline').decode())
         serial = next((item.split('=', 1)[1] for item in cmdline if item.startswith('androidboot.serialno=')), '')
         if serial != args.serial:
-            raise RuntimeError('RAM device serial does not match the selected Fastboot device')
+            raise RuntimeError('RAM device serial does not match the selected Fastboot device'
+                               ' —— 序列号不一致，请检查 --serial 参数')
         release = remote('uname -r').decode().strip()
         if release != manifest['kernel_release']:
-            raise RuntimeError('Installer kernel does not match this bundle')
+            raise RuntimeError('Installer kernel does not match this bundle'
+                               ' —— 安装器内核与包不匹配，请使用同一发布包内的全部文件')
         if not args.host_address:
             with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as route:
                 route.connect((args.device_address, 2323))

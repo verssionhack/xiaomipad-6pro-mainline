@@ -10,18 +10,27 @@ The system archive may be split into several files; the guide includes the joini
 ## Supported Device
 
 Xiaomi Pad 6 Pro, codename `liuqin`, SM8475. Other Xiaomi Pad models are not
-compatible. Initial installation and first boot have been tested on one known
-**256 GB partition layout**. Android recovery has not yet been independently validated.
-128 GB, 512 GB, other capacities, modified layouts and slot-B installation are
-unverified and unsupported. Equal capacity does not imply equal layout. Do not
-change constants or bypass checks to force an installation.
+compatible. Initial installation and first boot have been tested on a **256 GB
+unit**. Android recovery has not yet been independently validated. The 128 GB
+and 512 GB capacity variants are admitted by the rules below but have not been
+tested on real hardware; modified layouts and slot-B installation are not
+supported. Do not change constants or bypass checks to force an installation.
 
 The bootloader must be unlocked and slot A active. Device-side checks require
-Linux sysfs values of 493854720 sectors for sda, start 22065152 and size 471789528
-for sda35, and partition name userdata. These counts use 512-byte sectors, not
-filesystem block sizes. Unknown or mismatching device, layout, slot or session
-identity must stop installation. Checks reduce risk but do not guarantee recovery
-or replace real installation testing.
+these Linux sysfs values (capacities in 512-byte sectors, not filesystem
+blocks):
+
+| Item | Admitted value |
+|---|---|
+| userdata partition name (PARTNAME) | `userdata`, unique, on the first UFS LUN (sda) |
+| sda logical block size | 4096 |
+| userdata sectors | ≥ 33554432 (16 GiB) |
+
+The partition number and start offset vary with the capacity variant and are
+not part of the identity; both the installer and the boot chain resolve the
+target partition by PARTNAME. Unknown or mismatching device, slot or session
+identity must stop installation. Checks reduce risk but do not guarantee
+recovery or replace real installation testing.
 
 ## Data and Recovery
 

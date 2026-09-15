@@ -25,6 +25,11 @@ jobs:
         run: |
           python3 tests/installer.py
           sudo python3 tests/rootfs-archive.py
+      - name: Persistent-root fail-closed policy
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y busybox-static
+          sh tests/persistent-root.sh
       - name: Sensor startup policy
         run: |
           sudo apt-get update

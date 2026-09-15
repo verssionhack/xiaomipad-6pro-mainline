@@ -33,29 +33,53 @@ with tempfile.TemporaryDirectory() as directory:
     (root / 'boot.img').write_bytes(b'boot.img')
     (root / 'bundle.json').write_text(json.dumps({'device': 'liuqin', 'files': files,
                                                'status': 'OFFLINE_ASSEMBLED'}))
-    for reported in ('0x100000', hex(471789528 * 512 + 512), 'unknown'):
+    class StopFlow(Exception):
+        """Not an OSError/RuntimeError, so the RAM-channel retry loop lets it through."""
+
+    def run_install(argv_extra, reported, stdin_tty=False, answer=None):
         calls = []
 
         def fastboot(command, **kwargs):
             calls.append(command)
-            assert command[:4] == ['fastboot', '-s', 'TEST_SERIAL', 'getvar']
+            assert command[:3] == ['fastboot', '-s', 'TEST_SERIAL']
+            if command[3] == 'boot':
+                return SimpleNamespace(stdout='booting\n')
             name = command[-1]
             values = {'product': 'liuqin', 'unlocked': 'yes', 'current-slot': 'a',
-                      'partition-size:userdata': reported}
+                      'partition-size:userdata': reported, 'partition-size:boot_a': '0x10000000'}
             return SimpleNamespace(stdout=name + ': ' + values[name] + '\n')
 
+        stdin = SimpleNamespace(isatty=lambda: stdin_tty)
         with patch.object(installer.sys, 'argv', ['install.py', '--bundle', str(root),
                           '--serial', 'TEST_SERIAL', '--backup', str(root.parent / 'unused-backup'),
-                          '--erase-userdata', '--allow-unverified']), \
-             patch.object(installer.subprocess, 'run', side_effect=fastboot):
+                          '--erase-userdata', '--allow-unverified', *argv_extra]), \
+             patch.object(installer.subprocess, 'run', side_effect=fastboot), \
+             patch.object(installer.sys, 'stdin', stdin), \
+             patch('builtins.input', lambda *a: answer), \
+             patch.object(installer, 'command', side_effect=StopFlow('stop after boot')):
             try:
                 installer.main()
-            except (SystemExit, RuntimeError):
+            except (SystemExit, RuntimeError, StopFlow):
                 pass
             else:
-                raise AssertionError('unsupported or unknown userdata size was accepted')
-        assert calls[-1][-1] == 'partition-size:userdata'
-    print('PASS: wrong and unknown layouts rejected before RAM boot or partition writes')
+                raise AssertionError('installation unexpectedly completed: ' + reported)
+        return calls
+
+    for reported in ('0x100000', hex(8 * 1024**3), 'unknown'):
+        calls = run_install([], reported)
+        assert calls[-1][-1] == 'partition-size:userdata', (reported, calls)
+    print('PASS: undersized and unknown userdata layouts are rejected before RAM boot')
+
+    for reported in (hex(16 * 1024**3), hex(471789528 * 512)):
+        calls = run_install(['--yes'], reported)
+        assert calls[-1][3] == 'boot', (reported, calls)
+    print('PASS: userdata layouts of 16 GiB and above are admitted')
+
+    calls = run_install([], hex(471789528 * 512), stdin_tty=True, answer='no')
+    assert not any(call[3:4] == ['boot'] for call in calls)
+    calls = run_install([], hex(471789528 * 512), stdin_tty=True, answer='YES')
+    assert calls[-1][3] == 'boot'
+    print('PASS: interactive erasure confirmation gates the RAM installer boot')
 
 # A local fake shell supplies a CRLF transcript containing the echoed command.
 # Only complete marker lines may finish the transaction, not the echo itself.

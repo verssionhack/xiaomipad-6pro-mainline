@@ -48,7 +48,7 @@ and device trees; other batches, capacities and accessory combinations are not i
 | Internal storage | UFS / ext4 | ✅ Working | Persistent system and packages; installer targets the known 256 GB layout only |
 | Display | Novatek NT36532 / dual DSI / DSC | ✅ Working | 2880 x 1800 at 120 Hz; other refresh rates are not individually tested |
 | Manual brightness | Kinetic KTZ8866 backlight | ✅ Working | Backlight and manual brightness adjustment |
-| Touchscreen | Novatek NT36532 / SPI | ✅ Working | Touch input, swipes and gestures |
+| Touchscreen | Novatek NT36532 / SPI (CSOT or TM panel) | ✅ Working | Driver selects the firmware by panel module; touch input, swipes and gestures |
 | Magnetic keyboard | Nanosic WN8030 | ✅ Working | Character and volume keys, reattachment; suspend recovery not fully covered |
 | Stylus | NVTCapacitivePen input interface | 🧪 Unverified | Coordinates, pressure, buttons and input after wake not tested |
 | Hall switches | GPIO / SW_LID / SW_TABLET_MODE | 🟡 Partial | Switch states are readable; cover-close and open-to-wake policies not fully validated |

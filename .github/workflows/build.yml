@@ -1,20 +1,8 @@
 name: Kernel build
-on:
-  push:
-    paths:
-      - 'kernel/source.json'
-      - 'device/configs/**'
-      - 'tools/build-liuqin-kernel*'
-      - '.github/actions/kernel/**'
-      - '.github/workflows/build.yml'
-  pull_request:
-    paths:
-      - 'kernel/source.json'
-      - 'device/configs/**'
-      - 'tools/build-liuqin-kernel*'
-      - '.github/actions/kernel/**'
-      - '.github/workflows/build.yml'
-  workflow_dispatch:
+# Runs on every push/PR so the job can be a required status check; the build
+# itself is skipped unless kernel-affecting paths changed (a skipped job still
+# satisfies branch protection).
+on: [push, pull_request, workflow_dispatch]
 permissions:
   contents: read
 concurrency:
@@ -29,6 +17,25 @@ jobs:
         with:
           path: project
           persist-credentials: false
+          fetch-depth: 0
+      - id: affected
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base="${{ github.event.pull_request.base.sha }}"
+          else
+            base="${{ github.event.before }}"
+          fi
+          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
+            echo 'needed=true' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if git -C project diff --name-only "$base" "${{ github.sha }}" |
+             grep -qE '^(kernel/source\.json|device/configs/|tools/build-liuqin-kernel|\.github/actions/kernel/|\.github/workflows/build\.yml)'; then
+            echo 'needed=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'needed=false' >> "$GITHUB_OUTPUT"
+          fi
       - uses: ./project/.github/actions/kernel
+        if: steps.affected.outputs.needed == 'true'
         with:
           kernel-repository: ${{ github.repository_owner }}/linux-sm8450-liuqin

@@ -11,7 +11,7 @@ project_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 rootfs=${ROOTFS:-$project_root/tools/local/kali-rootfs-arm64/rootfs}
 source_manifest=${SOURCE_MANIFEST:-$project_root/device/sensors/sources.manifest}
 source_cache=${SOURCE_CACHE:-$project_root/tools/local/sensor-stack-src}
-rom_sensors=${ROM_SENSORS:-$project_root/tools/local/roms/liuqin/OS2.0.6.0.VMYCNXM/extracted/super-work/vendor-extract/etc/sensors}
+rom_sensors=${ROM_SENSORS:-$project_root/tools/local/roms/liuqin/OS2.0.203.0.VMYCNXM/extracted/super-work/vendor-extract/sensors}
 static_overlay=${SENSORS_OVERLAY:-$project_root/device/sensors-overlay}
 ssc_accel_test_runner=$project_root/tests/ssc-accel-integration.py
 hexagonrpc_patch=${HEXAGONRPC_PATCH:-$project_root/device/sensors/patches/0001-hexagonrpcd-expose-the-SSC-registry-version-sibling.patch}

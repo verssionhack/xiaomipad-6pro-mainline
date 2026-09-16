@@ -17,7 +17,7 @@ This project is only for the **Xiaomi Pad 6 Pro (liuqin, SM8475)**. Other Xiaomi
 
 - **Data loss**: unlocking the bootloader and performing an initial installation erase user data. Back up your files first.
 - **Storage and layout**: installation has been tested on one known **256 GB partition layout**, not every 256 GB device. Other capacities, modified partition layouts and slot-B installation are unverified and unsupported. Do not bypass the checks.
-- **Validation scope**: initial installation, first boot, rotation, touch, the magnetic keyboard and audio have been tested. Android recovery still requires separate device validation.
+- **Validation scope**: initial installation, first boot, rotation, touch, the magnetic keyboard (including its touchpad), audio and USB OTG host mode (wired mouse) have been tested. Android recovery still requires separate device validation.
 - **Installation layout**: Ubuntu is installed as the sole operating system. Android dual boot is not provided.
 - **Recovery preparation**: obtain the matching stock firmware and read the [data and recovery instructions](docs/FLASHING.md#data-and-recovery) before installing.
 - **Hardware limitations**: some features are incomplete. Review the hardware support table below.
@@ -55,7 +55,7 @@ and device trees; other batches, capacities and accessory combinations are not i
 | Display | Novatek NT36532 / dual DSI / DSC | ✅ Working | 2880 x 1800 at 120 Hz; other refresh rates are not individually tested |
 | Manual brightness | Kinetic KTZ8866 backlight | ✅ Working | Backlight and manual brightness adjustment |
 | Touchscreen | Novatek NT36532 / SPI (CSOT or TM panel) | ✅ Working | Driver selects the firmware by panel module; touch input, swipes and gestures |
-| Magnetic keyboard | Nanosic WN8030 | ✅ Working | Character and volume keys, reattachment; suspend recovery not fully covered |
+| Magnetic keyboard | Nanosic WN8030 | ✅ Working | Character and volume keys, touchpad, reattachment; suspend recovery not fully covered |
 | Stylus | NVTCapacitivePen input interface | 🧪 Unverified | Coordinates, pressure, buttons and input after wake not tested |
 | Hall switches | GPIO / SW_LID / SW_TABLET_MODE | 🟡 Partial | Switch states are readable; cover-close and open-to-wake policies not fully validated |
 
@@ -68,9 +68,9 @@ and device trees; other batches, capacities and accessory combinations are not i
 | Wi-Fi hotspot / AP | NetworkManager / ath11k | 🧪 Unverified | Confirmed networking scope is client mode |
 | Bluetooth | QCA6490 / hci_qca / BlueZ | ✅ Working | Everyday Bluetooth functionality is usable |
 | USB 2.0 device mode | Synopsys DWC3 / NXP eUSB2 repeater | ✅ Working | USB NCM networking and transfer; High-Speed device mode |
-| USB reconnect after charging | USB-C / USB gadget | 🟡 Partial | Reconnection reliability after charger switching remains unresolved |
-| USB 3.x SuperSpeed | USB controller / PHY | ❌ Unsupported | Current configuration is restricted to USB 2.0 High-Speed |
-| USB OTG / host mode | USB-C data-role switching | ❌ Unsupported | Fixed to peripheral mode; USB drives, keyboards and docks are not promised |
+| USB reconnect after charging | USB-C / USB gadget | 🟡 Partial | Since v0.1.1 the UCSI typec controller negotiates automatically; a dedicated retest is pending |
+| USB 3.x SuperSpeed | USB controller / PHY | 🧪 Unverified | Since v0.1.1 the SM8475 PHY tables and controller are in place; SuperSpeed peripheral enumeration untested |
+| USB OTG / host mode | USB-C data-role switching | ✅ Working | Since v0.1.1 UCSI negotiates the role automatically; wired mouse validated, USB drives and docks pending |
 | USB-C external display | Video output / docks | 🧪 Unverified | External-monitor output has not been tested |
 
 ### Audio, Video and Sensors

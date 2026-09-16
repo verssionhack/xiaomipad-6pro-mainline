@@ -31,8 +31,8 @@ they modify.
 Desktop and build components
 ----------------------------
 
-* GNOME Control Center: Ubuntu source package 1:50.0-0ubuntu6.
-  https://archive.ubuntu.com/ubuntu/pool/main/g/gnome-control-center/
+* GNOME Control Center: Kali source package 1:47.90-1.
+  https://archive.kali.org/kali/pool/main/g/gnome-control-center/
   See the source package's COPYING, debian/copyright and file-level notices.
   device/gnome-control-center/patches modifies that program and is not covered
   by the project's MIT license.
@@ -43,7 +43,7 @@ Desktop and build components
   https://android.googlesource.com/platform/system/tools/mkbootimg/
 * BusyBox: GPL-2.0, with file-level exceptions as documented upstream.
   https://busybox.net/
-* Ubuntu packages: each package retains its own license and copyright notices,
+* Kali Linux packages: each package retains its own license and copyright notices,
   available in its source package and /usr/share/doc/*/copyright.
 
 Binary releases must identify the corresponding source versions and provide

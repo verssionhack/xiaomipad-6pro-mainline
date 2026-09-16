@@ -12,7 +12,7 @@ import subprocess
 
 
 INPUTS = {
-    'UBUNTU_DESKTOP_ROOT', 'DESKTOP_ROOTFS_MANIFEST', 'FIRMWARE_POOL',
+    'KALI_ROOT_ROOTFS', 'KALI_ROOTFS_MANIFEST', 'FIRMWARE_POOL',
     'FIRMWARE_TREE', 'FIRMWARE_MANIFEST_SHA256', 'AUDIO_TOPOLOGY',
     'WLAN_HSP2_TUPLE', 'STOCK_OVERLAY_DIR', 'STOCK_BASE_DIR',
     'SENSOR_STACK_TAR', 'SENSOR_STACK_SHA256', 'POWER_SETTINGS_BINARY',
@@ -73,7 +73,7 @@ def main():
         'assemble': ('build-liuqin-native-root.sh', ['assemble'], out / 'root'),
         'manifest': ('build-liuqin-native-root.sh', ['manifest'], out / 'root'),
         'boot': ('build-liuqin-native-boot.sh', [], out / 'boot'),
-        'runtime': ('lib/build-installer-runtime.py', ['--root', supplied['UBUNTU_DESKTOP_ROOT'],
+        'runtime': ('lib/build-installer-runtime.py', ['--root', supplied['KALI_ROOT_ROOTFS'],
                                                      '--out', str(out / 'installer-runtime')], out / 'installer-runtime'),
         'installer': ('build-liuqin-native-boot.sh', [], out / 'installer'),
         'pack': ('build-liuqin-native-root.sh', ['pack'], out / 'root'),

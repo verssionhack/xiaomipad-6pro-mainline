@@ -61,11 +61,11 @@ sudo liuqin-rescue on
 
 ## 恢复 Android
 
-恢复会清除 Ubuntu，需要使用匹配的原厂 Fastboot ROM 完成系统恢复和 userdata 初始化。
+恢复会清除 Kali Linux，需要使用匹配的原厂 Fastboot ROM 完成系统恢复和 userdata 初始化。
 仅还原 boot_a 不等于恢复 Android。
 
 使用原厂完整清刷流程，不用保留数据或重新上锁的变体；保留原厂防回滚检查。
 不得恢复其他平板的 persist 或校准。在仍有非原厂镜像时保持 Bootloader 解锁。
 原厂 ROM 从上游取得，不在本项目重复托管。
 
-Android 恢复路线仍待独立真机验证，不应将 Ubuntu 安装通过等同于恢复已验证。
+Android 恢复路线仍待独立真机验证，不应将 Kali Linux 安装通过等同于恢复已验证。

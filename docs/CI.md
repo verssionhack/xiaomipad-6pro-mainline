@@ -36,7 +36,7 @@ to also assemble images automatically when relevant code changes reach `main`.
 
 Set `LIUQIN_IMAGE_INPUTS` to a runner-local JSON file (default
 `/opt/liuqin/inputs.json`). It contains the prepared-input variables listed by
-`tools/build-liuqin-image.py`: Ubuntu root and manifest, firmware pool and prepared
+`tools/build-liuqin-image.py`: Kali root and manifest, firmware pool and prepared
 tree, audio topology, WLAN set, stock DTB/DTBO inputs, sensor archive, Settings
 binary and its build manifest, BusyBox and mkbootimg. Hash values remain pinned;
 the local paths and raw input file are not uploaded with artifacts. Upstream
@@ -54,7 +54,7 @@ python3 tools/install-liuqin.py --bundle out/image/bundle --check
 The workflow does not create a public Release or mark a bundle device-tested.
 Full-image CI requires a configured dedicated runner. Test installation on the
 final candidate before marking a bundle device-tested; report Android recovery
-separately and do not claim it is validated by a successful Ubuntu installation.
+separately and do not claim it is validated by a successful Kali Linux installation.
 
 ## Public Delivery
 
@@ -75,6 +75,6 @@ firmware repository. Small, stable, generic firmware binaries may also be tracke
 under `device/firmware/` with their provenance, hashes and applicable notices;
 this is an allowed layout, not a claim that all firmware is already imported.
 Keep one authoritative copy and avoid repeatedly committing large binary sets.
-Upstream Ubuntu images, unmodified upstream components and
+Upstream Kali Linux images, unmodified upstream components and
 full stock ROMs are not mirrored here. Per-device calibration and addresses are
 always obtained from the user's own tablet and are never Release assets.

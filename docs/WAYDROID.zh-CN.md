@@ -42,6 +42,6 @@ sudo systemctl enable --now waydroid-container
 
 - 默认镜像**不含 Google 服务**；自行添加需遵守相应条款。
 - 相机、麦克风、传感器、蜂窝电话等依赖厂商 HAL 的功能不可用，与本机
-  Ubuntu 的限制一致。
+  Kali Linux 的限制一致。
 - 图形经由 Mesa/Freedreno 硬件加速；部分游戏和 3D 应用的兼容性未知。
 - 该功能尚未随发布包做独立真机验证，属于实验性支持。

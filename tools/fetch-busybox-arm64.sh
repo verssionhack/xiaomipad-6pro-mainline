@@ -5,9 +5,9 @@ set -eu
 project_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 download_dir="$project_root/tools/local/downloads"
 extract_dir="$project_root/tools/local/busybox-arm64"
-package=busybox-static_1.36.1-6ubuntu3.1_arm64.deb
-url="http://ports.ubuntu.com/pool/main/b/busybox/$package"
-package_sha256=d96535e0402c011e0ee43449799df2f4504d44b842e4f2b3a6cbc845508eaafc
+package=busybox-static_1.36.1-11_arm64.deb
+url="http://archive.kali.org/kali-pool/main/b/busybox/$package"
+package_sha256=PLACEHOLDER_KALI_BUSYBOX_SHA256
 binary_sha256=52151e7f322f926b64049cdaa1410dc3ea6485525e0624b05813791c219ae933
 
 mkdir -p "$download_dir" "$extract_dir"

@@ -1,11 +1,11 @@
 #!/bin/sh
 # SPDX-License-Identifier: MIT
 #
-# Assemble the native Ubuntu root filesystem:
+# Assemble the native Kali Linux root filesystem:
 #
-#   pinned Ubuntu 26.04 desktop arm64 rootfs
+#   pinned Kali Linux Rolling arm64 rootfs
 #   + the five liuqin debs installed in an ARM64 chroot
-#   + first-boot assembly (no ubuntu account, no autologin, marker, unit links)
+#   + first-boot assembly (no autologin, marker, unit links)
 #
 # The output tree is generic: per-device data (cirrus calibration, BT address,
 # WLAN MAC, sensor registry) is provisioned at install time and is asserted
@@ -28,21 +28,21 @@ set -eu
 
 project_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 out_dir=${OUT_DIR:-"$project_root/out/native-root"}
-desktop_root=${UBUNTU_DESKTOP_ROOT:-"$project_root/tools/local/ubuntu-desktop-26.04-arm64/rootfs"}
-desktop_manifest=${DESKTOP_ROOTFS_MANIFEST:-"$desktop_root.manifest"}
-desktop_manifest_sha256=175ca2299263545973831606e397cce3fbc79298d97eb0bd7e216ac34944eed7
+desktop_root=${KALI_ROOT_ROOTFS:-"$project_root/tools/local/kali-rootfs-arm64/rootfs"}
+desktop_manifest=${KALI_ROOTFS_MANIFEST:-"$desktop_root.manifest"}
+desktop_manifest_sha256=PLACEHOLDER_KALI_ROOTFS_MANIFEST_SHA256
 debs_dir=${DEBS_DIR:-"$project_root/out/liuqin-debs"}
 # Shared with test-liuqin-debs.sh: the archive indexes are downloaded once per
 # host, not once per runner, and the shipped tree keeps the pinned (empty)
 # lists state instead of carrying stale host-fetched indexes.
-apt_cache=${APT_CACHE_DIR:-"$project_root/tools/local/apt-cache-26.04-arm64"}
+apt_cache=${APT_CACHE_DIR:-"$project_root/tools/local/apt-cache-kali-rolling-arm64"}
 marker_sha256=4fdae4f7a27af8b0d4a2bbc168c7f01c3c5c6b5e245fcc521389d662f8212c5b
 
 die() { printf 'build-liuqin-native-root: %s\n' "$*" >&2; exit 1; }
 say() { printf 'build-liuqin-native-root: %s\n' "$*"; }
 
 [ "$(id -u)" = 0 ] || die 'run as root (tree copy, chroot and ownership preservation need it)'
-[ -x "$desktop_root/usr/lib/systemd/systemd" ] || die "not an Ubuntu root: $desktop_root"
+[ -x "$desktop_root/usr/lib/systemd/systemd" ] || die "not a valid rootfs: $desktop_root"
 [ -f "$desktop_manifest" ] || die "desktop tree manifest is unavailable: $desktop_manifest"
 [ "$(sha256sum "$desktop_manifest" | cut -d' ' -f1)" = "$desktop_manifest_sha256" ] ||
 	die 'desktop tree manifest identity mismatch'

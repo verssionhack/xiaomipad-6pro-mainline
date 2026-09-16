@@ -454,7 +454,7 @@ make_gnome_tree() {
 		"$tree/usr/lib/firmware/qcom/sm8450" \
 		"$tree/usr/share/qcom/sm8450/Xiaomi/liuqin/sensors" +		"$tree/usr/share/liuqin"
 	printf 'LIUQIN_GNOME_ROOT_V1\n' >"$tree/etc/liuqin-gnome-root"
-	printf '[daemon]\nAutomaticLogin=ubuntu\n' >"$tree/etc/gdm3/custom.conf"
+	printf '[daemon]\nAutomaticLogin=kali\n' >"$tree/etc/gdm3/custom.conf"
 	printf '#!/bin/sh\nexit 0\n' >"$tree/usr/lib/systemd/systemd"
 	chmod 0755 "$tree/usr/lib/systemd/systemd"
 	printf '# gdm unit\n' >"$tree/usr/lib/systemd/system/gdm.service"

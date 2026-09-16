@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-"""Build the device's GNOME Settings program from the Ubuntu source package."""
+"""Build the device's GNOME Settings program from the Kali source package."""
 
 import argparse
 import fcntl
@@ -63,7 +63,7 @@ def build(rootfs, source, out, lock, jobs):
     os.unshare(os.CLONE_NEWNS)
     run('mount', '--make-rprivate', '/')
     if not (rootfs / 'usr/lib/systemd/systemd').is_file():
-        raise SystemExit('Missing Ubuntu ARM64 root filesystem; use --rootfs')
+        raise SystemExit('Missing Kali ARM64 root filesystem; use --rootfs')
     manifest = Path(str(rootfs) + '.manifest')
     if not manifest.is_file():
         raise SystemExit('Root filesystem manifest is missing')
@@ -162,7 +162,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--prepare-only', action='store_true')
     parser.add_argument('--out', type=Path, default=project / 'out/gnome-control-center')
-    parser.add_argument('--rootfs', type=Path, default=project / 'tools/local/ubuntu-desktop-26.04-arm64/rootfs')
+    parser.add_argument('--rootfs', type=Path, default=project / 'tools/local/kali-rootfs-arm64/rootfs')
     parser.add_argument('--jobs', type=int, default=min(os.cpu_count() or 1, 8))
     args = parser.parse_args()
     if args.jobs < 1:

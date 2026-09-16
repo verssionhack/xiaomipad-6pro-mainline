@@ -48,7 +48,7 @@ Then start Waydroid from the application list, or run
 - The default image ships **without Google services**; adding them is subject
   to their terms.
 - Features that depend on vendor HALs -- camera, microphone, sensors and
-  cellular telephony -- are unavailable, matching the Ubuntu limitations on
+  cellular telephony -- are unavailable, matching the Kali Linux limitations on
   this device.
 - Graphics use hardware acceleration through Mesa/Freedreno; compatibility
   with games and 3D applications is not established.

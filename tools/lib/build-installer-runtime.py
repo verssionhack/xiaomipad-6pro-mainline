@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-"""Extract installer tools and their ELF dependencies from an Ubuntu ARM64 root."""
+"""Extract installer tools and their ELF dependencies from a Kali ARM64 root."""
 import argparse
 import hashlib
 import json

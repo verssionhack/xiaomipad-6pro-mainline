@@ -34,7 +34,7 @@ recovery or replace real installation testing.
 
 ## Data and Recovery
 
-Ubuntu will use the Android userdata partition. Initial installation is
+Kali Linux will use the Android userdata partition. Initial installation is
 destructive and does not provide Android dual boot. Unlocking the bootloader
 also erases user data.
 
@@ -51,7 +51,7 @@ Never use another tablet's `persist` image or calibration data.
 
 Returning to Android requires restoring the appropriate stock firmware and
 preparing userdata for Android. Replacing only the boot image does not undo an
-Ubuntu installation. Keep the bootloader unlocked while non-stock boot images
+Kali Linux installation. Keep the bootloader unlocked while non-stock boot images
 remain installed.
 
 ## Release Bundle

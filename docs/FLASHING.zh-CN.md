@@ -29,7 +29,7 @@ PARTNAME 解析目标分区。型号、槽位或会话身份无法确认时，�
 
 ## 数据与恢复
 
-Ubuntu 将使用 Android 的 userdata 分区。首次安装会清除数据，不提供 Android
+Kali Linux 将使用 Android 的 userdata 分区。首次安装会清除数据，不提供 Android
 双系统启动。解锁 Bootloader 也会清除用户数据。
 
 安装前需要：
@@ -43,7 +43,7 @@ Ubuntu 将使用 Android 的 userdata 分区。首次安装会清除数据，不
 镜像或校准数据。
 
 恢复 Android 需要还原适配的原厂固件，并为 Android 重新准备 userdata。
-仅替换 boot 镜像不能撤销 Ubuntu 安装。设备上仍有非原厂启动镜像时，应保持
+仅替换 boot 镜像不能撤销 Kali Linux 安装。设备上仍有非原厂启动镜像时，应保持
 Bootloader 解锁。
 
 ## 发布内容

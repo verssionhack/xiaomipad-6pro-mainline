@@ -16,7 +16,7 @@ workspace/
 `sm8450-mainline/linux`，设备分支为 `liuqin-6.17`。
 构建脚本会在编译前核对源码提交和最终配置。
 
-Ubuntu 24.04 主机依赖：
+Debian/Ubuntu 主机依赖：
 
 ```sh
 sudo apt-get update
@@ -55,30 +55,29 @@ python3 tools/build-liuqin-kernel.py --jobs 12
 
 | 内容 | 获取与维护方式 |
 |---|---|
-| 原版 Ubuntu 桌面基础系统 | 脚本从 Canonical 下载固定 ISO、校验后提取；本仓库不镜像原版 ISO |
-| 未修改的 Ubuntu 软件包、BusyBox | 从 Ubuntu 软件源下载，复用本地缓存；不另建软件包镜像站 |
+| Kali Linux rootfs 基础系统 | 脚本下载固定的 Kali Linux arm64 rootfs tarball、校验后解压；本仓库不镜像原版 tarball |
+| 未修改的 Kali Linux 软件包、BusyBox | 从 Kali Linux 软件源下载，复用本地缓存；不另建软件包镜像站 |
 | 上游工具与用户态源码 | 使用固定上游版本；本仓库保留调用代码、必要补丁和版本引用 |
 | 设备内核与项目适配 | 本项目两仓维护源码；安装版本提供匹配的预编译组件 |
 | 板级固件组合 | 安装所需组件由版本物料统一管理，不要求用户拼接实验产物；不重复托管整个原厂 ROM |
 | 本机校准、设备地址 | 安装时读取用户自己的平板，不能包含在通用包中 |
-| 已适配的 Ubuntu 系统 | 项目安装版本的成品，不等同未修改的上游 rootfs |
+| 已适配的 Kali Linux 系统 | 项目安装版本的成品，不等同未修改的上游 rootfs |
 
 构建者从上游下载基础输入后执行本项目装配；普通安装用户使用匹配的成品包，
 不需要自己编译内核、设置程序或逐项查找依赖。安装包见 [GitHub Releases](https://github.com/yzddmr6/xiaomipad-6pro-mainline/releases)，
 请遵守对应版本的验证范围与限制。
 
-### Ubuntu 基础系统
+### Kali Linux Rootfs
 
-需要 curl、util-linux（flock）、7z 和 squashfs-tools。按顺序执行：
+需要 curl、util-linux（flock）和 tar。按顺序执行：
 
 ```sh
-sh tools/build-liuqin-ubuntu-desktop-rootfs.sh download
-sh tools/build-liuqin-ubuntu-desktop-rootfs.sh casper
-sudo sh tools/build-liuqin-ubuntu-desktop-rootfs.sh extract
+sh tools/build-liuqin-kali-rootfs.sh download
+sudo sh tools/build-liuqin-kali-rootfs.sh extract
 ```
 
-下载复用已校验缓存，传输中断可续传；`UBUNTU_DESKTOP_URL` 可指定提供同一文件的镜像，
-不会接受不同版本。输入位置可用 `UBUNTU_DESKTOP_INPUT` 指定，后续步骤须使用相同值。
+下载复用已校验缓存，传输中断可续传；`KALI_ROOTFS_URL` 可指定提供同一文件的镜像，
+不会接受不同版本。输入位置可用 `KALI_ROOT_INPUT` 指定，后续步骤须使用相同值。
 提取只准备桌面基础系统；还需装入项目设备组件，不能直接作为平板启动镜像。
 
 ### 设备组件
@@ -100,7 +99,7 @@ qca-swiss-army-knife 提交 `6df4dae3e2f5e4c2903f3cafd40996fc1b3639ce` 下的
 
 GNOME 设置程序的源码与补丁由 `device/gnome-control-center/source.json` 固定。
 主机需提供 Python 3.12、curl、patch、dpkg-dev 和 AArch64 binfmt 解释器，并准备好
-Ubuntu ARM64 根文件系统。先准备源码：
+Kali Linux ARM64 根文件系统。先准备源码：
 
 ```sh
 python3 tools/build-liuqin-settings.py --prepare-only
@@ -154,7 +153,7 @@ native boot 构建器直接使用指定内核的 Image、DTB，以及已装配�
 ## 持续集成
 
 工作流使用与本地相同的 Python 入口编译固定版本内核，产物为内核构建文件，
-不是可安装的 Ubuntu 发行包。内核仓库的提交构建与主项目的锁定版本构建共用同一入口。
+不是可安装的 Kali Linux 发行包。内核仓库的提交构建与主项目的锁定版本构建共用同一入口。
 整包装配使用 `tools/build-liuqin-image.py`，支持单阶段续跑；GitHub 整包任务需要配置专用构建机，
 默认手动触发，可在配置完成后启用 main 更新自动装配。详见[CI 配置](CI.md)。
 真机测试按[安装步骤](INSTALL-TESTING.zh-CN.md)进行。CI 编译成功不代表新安装包已通过真机验证。

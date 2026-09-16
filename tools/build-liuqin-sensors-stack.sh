@@ -2,13 +2,13 @@
 # SPDX-License-Identifier: MIT
 #
 # Reproducibly build the liuqin SSC userspace as an arm64 extension layer.
-# The stock Ubuntu 26.04 root is mounted as a read-only overlay lowerdir; apt
+# The stock Kali Linux Rolling root is mounted as a read-only overlay lowerdir; apt
 # and compilation can never mutate the release root.  Exact ROM configuration
 # is copied into the output, while per-device registry/calibration is excluded.
 set -eu
 
 project_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
-rootfs=${ROOTFS:-$project_root/tools/local/ubuntu-desktop-26.04-arm64/rootfs}
+rootfs=${ROOTFS:-$project_root/tools/local/kali-rootfs-arm64/rootfs}
 source_manifest=${SOURCE_MANIFEST:-$project_root/device/sensors/sources.manifest}
 source_cache=${SOURCE_CACHE:-$project_root/tools/local/sensor-stack-src}
 rom_sensors=${ROM_SENSORS:-$project_root/tools/local/roms/liuqin/OS2.0.6.0.VMYCNXM/extracted/super-work/vendor-extract/etc/sensors}
@@ -44,7 +44,7 @@ die() { printf 'build-liuqin-sensors-stack: %s\n' "$*" >&2; exit 1; }
 say() { printf 'build-liuqin-sensors-stack: %s\n' "$*"; }
 
 [ "$(id -u)" = 0 ] || die 'run as root (an overlay mount and arm64 chroot are required)'
-[ -x "$rootfs/usr/lib/systemd/systemd" ] || die "not an Ubuntu root: $rootfs"
+[ -x "$rootfs/usr/lib/systemd/systemd" ] || die "not a valid rootfs: $rootfs"
 [ -r "$source_manifest" ] || die "missing source manifest: $source_manifest"
 [ -r "$ssc_accel_test_runner" ] || die "missing SSC accelerometer test runner: $ssc_accel_test_runner"
 [ -r "$hexagonrpc_patch" ] || die "missing hexagonrpc patch: $hexagonrpc_patch"
@@ -236,7 +236,7 @@ if [ "$update_apt" = 1 ]; then
 elif [ "$update_apt" != 0 ]; then
 	die 'UPDATE_APT must be 0 or 1'
 else
-	say 'using the Ubuntu rootfs pinned package indexes (UPDATE_APT=0)'
+	say 'using the Kali rootfs pinned package indexes (UPDATE_APT=0)'
 fi
 chroot "$merged" /usr/bin/env DEBIAN_FRONTEND=noninteractive \
 	apt-get -o Acquire::Retries=3 -o DPkg::Options::=--no-triggers \
@@ -409,7 +409,7 @@ dpkg-query -W -f='${binary:Package}\t${Version}\t${Architecture}\n' \
 	gir1.2-umockdev-1.0 umockdev locales-all \
 	libprotobuf-c-dev protobuf-c-compiler protobuf-compiler libgudev-1.0-dev \
 	libpolkit-gobject-1-dev libsystemd-dev libjson-c-dev |
-	LC_ALL=C sort >/build/dest/ubuntu-resolute-build-deps.tsv
+	LC_ALL=C sort >/build/dest/kali-build-deps.tsv
 EOF
 chmod 0755 "$merged/build/build.sh"
 JOBS=$jobs chroot "$merged" /build/build.sh
@@ -447,7 +447,7 @@ cp "$ssc_accel_log" "$out_dir/artifacts/iio-ssc-accel-unskipped.log"
 # the SONAME symlink, rather than letting success depend on the build upperdir.
 mkdir -p "$dest/usr/lib/aarch64-linux-gnu"
 for qrtr_lib in "$merged"/usr/lib/aarch64-linux-gnu/libqrtr.so.1*; do
-	[ -e "$qrtr_lib" ] || die 'Ubuntu libqrtr1 installed no libqrtr.so.1 runtime'
+	[ -e "$qrtr_lib" ] || die 'Kali libqrtr1 installed no libqrtr.so.1 runtime'
 	cp -a "$qrtr_lib" "$dest/usr/lib/aarch64-linux-gnu/"
 done
 
@@ -465,7 +465,7 @@ rm -rf "$dest/usr/include/libssc" \
 rm -f "$dest/usr/lib/aarch64-linux-gnu/libhexagonrpc.so" \
 	"$dest/usr/lib/aarch64-linux-gnu/libssc.so" \
 	"$dest/usr/lib/aarch64-linux-gnu/pkgconfig/libssc.pc"
-# Ubuntu owns the 3.8 SensorProxy binary/unit/data paths.  Keep those package
+# Kali owns the 3.8 SensorProxy binary/unit/data paths.  Keep those package
 # files intact and install only our verified 3.9+SSC executable under
 # /usr/local; the drop-in above replaces ExecStart without fighting dpkg.
 install -D -m 0755 "$dest/usr/libexec/iio-sensor-proxy" \
@@ -496,8 +496,8 @@ cp "$source_manifest" "$dest/usr/share/doc/liuqin/sensor-stack-sources.manifest"
 	printf '%s  %s\n' "$expected_iio_release_patch_sha256" "${iio_release_patch##*/}"
 	printf '%s  %s\n' "$expected_iio_availability_patch_sha256" "${iio_availability_patch##*/}"
 } >"$dest/usr/share/doc/liuqin/sensor-stack-patches.manifest"
-mv "$dest/ubuntu-resolute-build-deps.tsv" \
-	"$dest/usr/share/doc/liuqin/ubuntu-resolute-sensor-build-deps.tsv"
+mv "$dest/kali-build-deps.tsv" \
+	"$dest/usr/share/doc/liuqin/kali-sensor-build-deps.tsv"
 
 # Do not enable the target at multi-user.target: it would run before the
 # FastRPC character device exists, become active with a skipped daemon, and
@@ -508,7 +508,7 @@ mv "$dest/ubuntu-resolute-build-deps.tsv" \
 find "$dest" -type f -perm /022 -exec chmod go-w {} +
 find "$dest/usr/libexec" "$dest/usr/local/sbin" -type f -exec chmod 0755 {} +
 
-# Close runtime libraries against the unmodified Ubuntu root, not the apt-rich
+# Close runtime libraries against the unmodified Kali root, not the apt-rich
 # build upper.  Copy only a SONAME that is absent from both the base and the
 # extension, plus its symlink target, then iterate because that object may add
 # another dependency.  This is how libprotobuf-c.so.1 was caught offline.
@@ -585,7 +585,7 @@ find "$dest" -type f -print | LC_ALL=C sort | while IFS= read -r elf; do
 		[ -n "$provider" ] || die "unclosed runtime dependency ${elf#$dest/}: $needed"
 		case $provider in
 		"$dest"/*) source=extension ;;
-		*) source=ubuntu-root ;;
+		*) source=kali-root ;;
 		esac
 		printf '%s\t%s\t%s\n' "${elf#$dest/}" "$needed" "$source" >>"$needed_audit"
 	done
@@ -595,8 +595,8 @@ done
 (cd "$dest" && find . -type f ! -name layer.manifest -printf '%P\0' |
 	LC_ALL=C sort -z | xargs -0 sha256sum) >"$out_dir/artifacts/layer.manifest"
 (cd "$dest" && find . -type l -printf '%P -> %l\n' | LC_ALL=C sort) >"$out_dir/artifacts/links.manifest"
-cp "$dest/usr/share/doc/liuqin/ubuntu-resolute-sensor-build-deps.tsv" \
-	"$out_dir/artifacts/ubuntu-resolute-build-deps.tsv"
+cp "$dest/usr/share/doc/liuqin/kali-sensor-build-deps.tsv" \
+	"$out_dir/artifacts/kali-build-deps.tsv"
 
 tar --sort=name --mtime='@0' --owner=0 --group=0 --numeric-owner \
 	--pax-option=delete=atime,delete=ctime -C "$dest" -cf "$out_dir/artifacts/sensor-stack.tar" .

@@ -71,7 +71,7 @@ close existing rescue connections. Release images leave it disabled by default.
 
 ## Recovery
 
-Returning to Android erases the Ubuntu installation and requires a compatible
+Returning to Android erases the Kali Linux installation and requires a compatible
 original Fastboot ROM, including its userdata initialization. Restoring boot_a
 alone is not a complete Android recovery.
 
@@ -80,5 +80,5 @@ variant. Preserve the anti-rollback checks. Never restore another tablet's
 persist or calibration. Keep the bootloader unlocked while non-stock images
 remain. The original ROM is an upstream input, not duplicated in this repository.
 
-Android recovery still requires independent device testing. Successful Ubuntu
+Android recovery still requires independent device testing. Successful Kali Linux
 installation does not establish that Android recovery has been validated.

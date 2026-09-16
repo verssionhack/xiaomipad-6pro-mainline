@@ -16,7 +16,7 @@ The kernel checkout must match the commit in `kernel/source.json`. The repositor
 is based on `sm8450-mainline/linux`; the device branch is `liuqin-6.17`.
 The build script verifies the commit and generated configuration before compiling.
 
-On Ubuntu 24.04, install the kernel build dependencies:
+On Debian/Ubuntu, install the kernel build dependencies:
 
 ```sh
 sudo apt-get update
@@ -58,33 +58,32 @@ complete toolchain and build inputs.
 
 | Component | Delivery |
 |---|---|
-| Original Ubuntu desktop base | Download the pinned Canonical ISO and extract it; this repository does not mirror the ISO |
-| Unmodified Ubuntu packages and BusyBox | Download from Ubuntu repositories and cache locally; no duplicate package mirror |
+| Kali Linux rootfs base | Download the pinned Kali Linux arm64 rootfs tarball and extract it; this repository does not mirror the tarball |
+| Unmodified Kali Linux packages and BusyBox | Download from Kali Linux repositories and cache locally; no duplicate package mirror |
 | Upstream tools and userspace source | Pin upstream versions; maintain integration code and necessary patches here |
 | Device kernel and project integration | Maintain source in the two project repositories; provide matching binaries with installation releases |
 | Board firmware set | Manage required components as release inputs, not scattered experiment outputs; do not mirror the entire stock ROM |
 | Factory calibration and device addresses | Read from the user's own tablet during installation; never include in generic packages |
-| Adapted Ubuntu system | A project installation artifact, distinct from the unmodified upstream rootfs |
+| Adapted Kali Linux system | A project installation artifact, distinct from the unmodified upstream rootfs |
 
 Builders download upstream inputs and assemble the system. Installation users use
 matching finished artifacts without compiling components or finding dependencies
 individually. Download installation bundles from [GitHub Releases](https://github.com/yzddmr6/xiaomipad-6pro-mainline/releases)
 and observe each release's tested scope and limitations.
 
-### Ubuntu Base
+### Kali Linux Rootfs
 
-Install curl, util-linux (flock), 7z and squashfs-tools, then run:
+Install curl, util-linux (flock) and tar, then run:
 
 ```sh
-sh tools/build-liuqin-ubuntu-desktop-rootfs.sh download
-sh tools/build-liuqin-ubuntu-desktop-rootfs.sh casper
-sudo sh tools/build-liuqin-ubuntu-desktop-rootfs.sh extract
+sh tools/build-liuqin-kali-rootfs.sh download
+sudo sh tools/build-liuqin-kali-rootfs.sh extract
 ```
 
 Verified cached downloads are reused and interrupted transfers can resume.
-`UBUNTU_DESKTOP_URL` may select a mirror supplying identical pinned bytes, not a
-different release. Set `UBUNTU_DESKTOP_INPUT` consistently across stages to change
-the input directory. Extraction prepares the desktop base only; project device
+`KALI_ROOTFS_URL` may select a mirror supplying identical pinned bytes, not a
+different release. Set `KALI_ROOT_INPUT` consistently across stages to change
+the input directory. Extraction prepares the rootfs base only; project device
 components must still be installed before it can boot on the tablet.
 
 ### Device Components
@@ -107,9 +106,9 @@ The device integration sources include system services, audio configuration,
 power-key support, sensor patches and the GNOME Settings patch. Sensor source
 versions are recorded in `device/sensors/sources.manifest`.
 
-GNOME Settings uses the Ubuntu source package and the patch recorded in
+GNOME Settings uses the Kali source package and the patch recorded in
 `device/gnome-control-center/source.json`. It requires Python 3.12, curl, patch,
-dpkg-dev and an AArch64 binfmt interpreter on the host, plus the prepared Ubuntu
+dpkg-dev and an AArch64 binfmt interpreter on the host, plus the prepared Kali
 ARM64 root filesystem. Prepare its source with:
 
 ```sh

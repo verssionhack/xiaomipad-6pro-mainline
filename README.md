@@ -1,6 +1,6 @@
-# Ubuntu for Xiaomi Pad 6 Pro
+# Kali Linux for Xiaomi Pad 6 Pro
 
-Run Ubuntu 26.04 on the Xiaomi Pad 6 Pro, with the GNOME desktop and a device-adapted kernel based on upstream Linux.
+Run Kali Linux Rolling on the Xiaomi Pad 6 Pro, with the GNOME desktop and a device-adapted kernel based on upstream Linux.
 
 **WeChat: 熵减矩阵 · Xiaohongshu: yzddmr6**
 Usage tips, AI discussions and community exchange, primarily in Chinese. [中文](README.zh-CN.md)
@@ -12,7 +12,7 @@ This project is only for the **Xiaomi Pad 6 Pro (liuqin, SM8475)**. Other Xiaomi
 - **Data loss**: unlocking the bootloader and performing an initial installation erase user data. Back up your files first.
 - **Storage and layout**: installation has been tested on one known **256 GB partition layout**, not every 256 GB device. Other capacities, modified partition layouts and slot-B installation are unverified and unsupported. Do not bypass the checks.
 - **Validation scope**: initial installation, first boot, rotation, touch, the magnetic keyboard and audio have been tested. Android recovery still requires separate device validation.
-- **Installation layout**: Ubuntu is installed as the sole operating system. Android dual boot is not provided.
+- **Installation layout**: Kali Linux is installed as the sole operating system. Android dual boot is not provided.
 - **Recovery preparation**: obtain the matching stock firmware and read the [data and recovery instructions](docs/FLASHING.md#data-and-recovery) before installing.
 - **Hardware limitations**: some features are incomplete. Review the hardware support table below.
 
@@ -25,7 +25,7 @@ Use a complete installation bundle from [GitHub Releases](https://github.com/yzd
 
 | I want to | Read |
 |---|---|
-| Install Ubuntu | [Installation guide](docs/FLASHING.md) |
+| Install Kali Linux | [Installation guide](docs/FLASHING.md) |
 | Build the kernel and device components | [Build guide](docs/BUILD.md) |
 | Restore Android | [Data and recovery instructions](docs/FLASHING.md#data-and-recovery) |
 
@@ -43,7 +43,7 @@ and device trees; other batches, capacities and accessory combinations are not i
 
 | Feature | Component / Implementation | Status | Scope and Limitations |
 |---|---|---|---|
-| SoC / CPU | Qualcomm Snapdragon 8+ Gen 1 (SM8475), ARM64 | ✅ Working | Kernel boot and Ubuntu desktop; not all power states are validated |
+| SoC / CPU | Qualcomm Snapdragon 8+ Gen 1 (SM8475), ARM64 | ✅ Working | Kernel boot and Kali Linux desktop; not all power states are validated |
 | GPU / compositing | Adreno 730 / Freedreno / Mesa | ✅ Working | Desktop acceleration; some applications need rendering workarounds |
 | Internal storage | UFS / ext4 | ✅ Working | Persistent system and packages; installer targets the known 256 GB layout only |
 | Display | Novatek NT36532 / dual DSI / DSC | ✅ Working | 2880 x 1800 at 120 Hz; other refresh rates are not individually tested |
@@ -97,10 +97,10 @@ and device trees; other batches, capacities and accessory combinations are not i
 
 ## Usage and Maintenance
 
-Ubuntu packages are managed through APT. Update instructions for the project kernel and device components will accompany each installation release.
+Kali Linux packages are managed through APT. Update instructions for the project kernel and device components will accompany each installation release.
 Do not mix boot images and system components from different releases.
 
-To run Android applications inside Ubuntu, Waydroid is supported; the required kernel configuration is built in. See [Waydroid support](docs/WAYDROID.md).
+To run Android applications inside Kali Linux, Waydroid is supported; the required kernel configuration is built in. See [Waydroid support](docs/WAYDROID.md).
 
 Report problems through GitHub Issues with the device model, system version, reproduction steps and relevant logs.
 Remove passwords, network credentials and personal information before sharing logs.
@@ -120,7 +120,7 @@ see [CONTRIBUTING.md](CONTRIBUTING.md).
 ## Acknowledgments and Licensing
 
 This project builds on the kernel work of [sm8450-mainline](https://github.com/sm8450-mainline/linux),
-along with Ubuntu, GNOME, Freedreno and the Linux Qualcomm community.
+along with Kali Linux, GNOME, Freedreno and the Linux Qualcomm community.
 
 Original project code is MIT-licensed unless a file states otherwise. Linux and third-party components retain their own licenses;
 firmware is subject to its respective owners' terms. See [LICENSE](LICENSE) and [NOTICE](NOTICE).

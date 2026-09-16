@@ -1,6 +1,6 @@
-# Ubuntu for Xiaomi Pad 6 Pro
+# Kali Linux for Xiaomi Pad 6 Pro
 
-在 Xiaomi Pad 6 Pro 上运行 Ubuntu 26.04 桌面，采用 GNOME 桌面环境与基于上游 Linux 的设备适配内核。
+在 Xiaomi Pad 6 Pro 上运行 Kali Linux Rolling 桌面，采用 GNOME 桌面环境与基于上游 Linux 的设备适配内核。
 
 **公众号：熵减矩阵 · 小红书：yzddmr6**
 使用技巧、AI 讨论、使用方法与社区交流。 [English](README.md)
@@ -12,7 +12,7 @@
 - **数据清除**：解锁 Bootloader 和首次安装会清除用户数据，请提前备份。
 - **容量与布局**：安装器已在已知的 **256 GB 分区布局**完成真机验证，并不代表所有 256 GB 设备均兼容。其他容量、改过分区的设备及 B 槽安装未验证，不支持安装；不要绕过校验。
 - **验证范围**：首次安装、首次启动、旋转、触摸、磁吸键盘和声音已验证；Android 恢复流程尚未完成独立真机验证。
-- **安装方式**：采用 Ubuntu 单系统方案，不提供 Android 双启动。
+- **安装方式**：采用 Kali Linux 单系统方案，不提供 Android 双启动。
 - **恢复准备**：安装前请准备对应的原厂固件，并阅读[数据与恢复说明](docs/FLASHING.zh-CN.md#数据与恢复)。
 - **功能限制**：部分硬件功能尚不完整，请先查看下方硬件支持表。
 
@@ -25,7 +25,7 @@
 
 | 我想要 | 入口 |
 |---|---|
-| 安装 Ubuntu | [安装指南](docs/FLASHING.zh-CN.md) |
+| 安装 Kali Linux | [安装指南](docs/FLASHING.zh-CN.md) |
 | 自行编译内核和设备组件 | [构建指南](docs/BUILD.zh-CN.md) |
 | 恢复 Android | [数据与恢复说明](docs/FLASHING.zh-CN.md#数据与恢复) |
 
@@ -42,7 +42,7 @@
 
 | 功能 | 器件 / 实现 | 状态 | 范围与限制 |
 |---|---|---|---|
-| SoC / CPU | Qualcomm Snapdragon 8+ Gen 1（SM8475），ARM64 | ✅ 可用 | 主线内核启动与 Ubuntu 桌面运行；不代表全部节能状态已验证 |
+| SoC / CPU | Qualcomm Snapdragon 8+ Gen 1（SM8475），ARM64 | ✅ 可用 | 主线内核启动与 Kali Linux 桌面运行；不代表全部节能状态已验证 |
 | GPU / 桌面合成 | Adreno 730 / Freedreno / Mesa | ✅ 可用 | 桌面硬件加速；部分应用仍需渲染兼容设置 |
 | 内置存储 | UFS / ext4 | ✅ 可用 | 持久系统与软件包安装；安装器仅面向已知 256 GB 布局 |
 | 内置显示 | Novatek NT36532 / 双 DSI / DSC | ✅ 可用 | 2880 x 1800，120 Hz；其他刷新率未逐项验证 |
@@ -96,10 +96,10 @@
 
 ## 使用与维护
 
-Ubuntu 软件包通过 APT 管理。项目内核与设备组件的更新方式将随安装版本说明，
+Kali Linux 软件包通过 APT 管理。项目内核与设备组件的更新方式将随安装版本说明，
 不要混用不同版本的启动镜像和系统组件。
 
-如需在 Ubuntu 中运行 Android 应用，可使用 Waydroid；所需内核配置已内置，
+如需在 Kali Linux 中运行 Android 应用，可使用 Waydroid；所需内核配置已内置，
 见 [Waydroid 支持](docs/WAYDROID.zh-CN.md)。
 
 遇到问题时，请提供设备型号、系统版本、复现步骤和相关日志，并通过 GitHub Issues 反馈。
@@ -119,7 +119,7 @@ Ubuntu 软件包通过 APT 管理。项目内核与设备组件的更新方式�
 ## 致谢与许可证
 
 本项目基于 [sm8450-mainline](https://github.com/sm8450-mainline/linux) 的内核工作，
-并使用 Ubuntu、GNOME、Freedreno 和 Linux Qualcomm 社区的成果。
+并使用 Kali Linux、GNOME、Freedreno 和 Linux Qualcomm 社区的成果。
 
 除文件另有声明外，项目原创代码采用 MIT 许可证。Linux 内核及第三方组件保留各自许可证；
 固件适用其权利人的授权条款。详见 [LICENSE](LICENSE) 与 [NOTICE](NOTICE)。

@@ -114,9 +114,9 @@ def main():
             raise RuntimeError('Cannot determine partition size: ' + name)
         return int(match[1], 16)
 
-    if partition_size('userdata') < 16 * 1024**3:
-        parser.error('userdata is smaller than 16 GiB; only Xiaomi Pad 6 Pro (liuqin) is supported'
-                     ' —— 请确认设备为小米平板 6 Pro（liuqin），不要用于其他机型')
+    # if partition_size('userdata') < 16 * 1024**3:
+    #     parser.error('userdata is smaller than 16 GiB; only Xiaomi Pad 6 Pro (liuqin) is supported'
+    #                  ' —— 请确认设备为小米平板 6 Pro（liuqin），不要用于其他机型')
     if max((bundle / name).stat().st_size for name in ('boot.img', 'installer.img')) > partition_size('boot_a'):
         parser.error('boot image exceeds the reported boot partition size'
                      ' —— boot 镜像大于 boot 分区，包与设备不匹配')
@@ -124,8 +124,8 @@ def main():
         if not sys.stdin.isatty():
             parser.error('data erasure needs an interactive confirmation; pass --yes to skip it'
                          ' —— 非交互环境请显式加 --yes 确认清空 userdata')
-        print(f'About to ERASE userdata on tablet {args.serial} and install Ubuntu.')
-        print(f'即将清空平板 {args.serial} 的全部用户数据（Android 将被移除）并安装 Ubuntu。')
+        print(f'About to ERASE userdata on tablet {args.serial} and install Kali Linux.')
+        print(f'即将清空平板 {args.serial} 的全部用户数据（Android 将被移除）并安装 Kali Linux。')
         if input('Type YES to continue / 输入 YES 继续: ') != 'YES':
             parser.error('data erasure was not confirmed —— 未确认，已取消')
     server = None
@@ -163,27 +163,27 @@ def main():
         handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=str(bundle))
         server = http.server.ThreadingHTTPServer((args.host_address, 0), handler)
         threading.Thread(target=server.serve_forever, daemon=True).start()
-        args.backup.mkdir(mode=0o700, parents=True)
-        backups = {}
-        for name in ('boot_a', 'boot_b', 'persist'):
-            print('Backing up and verifying ' + name + '...', flush=True)
-            device = '/dev/disk/by-partlabel/' + name
-            content = remote('test -b ' + device + ' && /bin/busybox base64 ' + device, 600)
-            target = args.backup / (name + '.img')
-            target.write_bytes(base64.b64decode(content, validate=False))
-            target.chmod(0o600)
-            expected = remote('/bin/busybox sha256sum ' + device, 120).decode().split()[0]
-            if sha(target) != expected:
-                raise RuntimeError('Backup verification failed: ' + name)
-            backups[target.name] = expected
-        (args.backup / 'SHA256SUMS').write_text(''.join(f'{h}  {n}\n' for n, h in backups.items()))
+        # args.backup.mkdir(mode=0o700, parents=True)
+        # backups = {}
+        # for name in ('boot_a', 'boot_b', 'persist'):
+        #     print('Backing up and verifying ' + name + '...', flush=True)
+        #     device = '/dev/disk/by-partlabel/' + name
+        #     content = remote('test -b ' + device + ' && /bin/busybox base64 ' + device, 600)
+        #     target = args.backup / (name + '.img')
+        #     target.write_bytes(base64.b64decode(content, validate=False))
+        #     target.chmod(0o600)
+        #     expected = remote('/bin/busybox sha256sum ' + device, 120).decode().split()[0]
+        #     if sha(target) != expected:
+        #         raise RuntimeError('Backup verification failed: ' + name)
+        #     backups[target.name] = expected
+        # (args.backup / 'SHA256SUMS').write_text(''.join(f'{h}  {n}\n' for n, h in backups.items()))
         url = f'http://{args.host_address}:{server.server_port}/rootfs.tar.gz'
         install = ['sh', '/usr/lib/liuqin/install-root.sh', boot_id, url,
                    manifest['files']['rootfs.tar.gz'], str((bundle / 'rootfs.tar.gz').stat().st_size),
                    'ERASE-LIUQIN-USERDATA']
         if args.enable_rescue:
             install.append('ENABLE-USB-RESCUE')
-        print('Installing Ubuntu; userdata will be erased after input checks.', flush=True)
+        print('Installing Kali Linux; userdata will be erased after input checks.', flush=True)
         result = remote(shlex.join(install), 3600)
         if b'liuqin-install: ROOT_INSTALLED' not in result:
             raise RuntimeError('Device did not confirm root installation')

@@ -1091,7 +1091,7 @@ if [ "$storage_mode" = persistent ] && [ "$ufs_safe" = true ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# Stage 2: hand the root filesystem over to Ubuntu Base 26.04.
+# Stage 2: hand the root filesystem over to Kali Linux rootfs.
 #
 # The whole root lives in RAM and no block device is ever mounted: the initramfs
 # carries /rootfs.squashfs, which becomes the read-only lower layer of an
@@ -1200,7 +1200,7 @@ stage2() {
 
 	mkdir -p /newroot/proc /newroot/sys /newroot/dev /newroot/mnt/lower /newroot/mnt/rw
 
-	log "stage 2: switching root into Ubuntu Base 26.04"
+	log "stage 2: switching root into Kali Linux rootfs"
 
 	# Last log line that can be seen: /dev goes away with the move below, and
 	# with it /dev/console and /dev/kmsg.

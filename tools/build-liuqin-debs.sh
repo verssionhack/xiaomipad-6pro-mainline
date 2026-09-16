@@ -12,7 +12,7 @@
 #   all             everything whose inputs are present (kernel may be gated)
 #
 # Distro-file ownership conflicts use dpkg-divert in preinst/postrm, never a
-# bare overwrite.  The set was measured against the pinned 26.04 desktop root:
+# bare overwrite.  The set was measured against the pinned Kali Linux Rolling rootfs:
 # 4 firmware files (linux-firmware-qualcomm-wireless, different bytes) plus the
 # two reviewed component replacements (gnome-control-center power panel, SSC
 # iio-sensor-proxy).  The native install keeps the distro gdm3 custom.conf
@@ -29,8 +29,8 @@ maintainer='yzddmr6 <46088090+yzddmr6@users.noreply.github.com>'
 firmware_tree=${FIRMWARE_TREE:-"$project_root/device/firmware"}
 firmware_manifest_sha256=${FIRMWARE_MANIFEST_SHA256:-012c413e0a5d5c3c14631fbdfe50da5c51e95ffc1ae431b8d93f776538b65ba2}
 overlay=${GNOME_OVERLAY:-"$project_root/device/gnome-overlay"}
-ubuntu_desktop_root=${UBUNTU_DESKTOP_ROOT:-"$project_root/tools/local/ubuntu-desktop-26.04-arm64/rootfs"}
-audio_probe_libasound=$ubuntu_desktop_root/usr/lib/aarch64-linux-gnu/libasound.so.2.0.0
+kali_rootfs=${KALI_ROOT_ROOTFS:-"$project_root/tools/local/kali-rootfs-arm64/rootfs"}
+audio_probe_libasound=$kali_rootfs/usr/lib/aarch64-linux-gnu/libasound.so.2.0.0
 busybox=${BUSYBOX:-"$project_root/tools/local/busybox-arm64/usr/bin/busybox"}
 busybox_sha256=${BUSYBOX_SHA256:-52151e7f322f926b64049cdaa1410dc3ea6485525e0624b05813791c219ae933}
 power_key_cc=${POWER_KEY_CC:-$(command -v aarch64-linux-gnu-gcc || true)}

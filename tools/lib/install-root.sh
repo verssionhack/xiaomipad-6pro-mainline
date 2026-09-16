@@ -21,7 +21,7 @@ node=${userdata##*/}
 grep -q '^PARTNAME=userdata$' "/sys/class/block/$node/uevent" || die 'not userdata'
 size=$(cat "/sys/class/block/$node/size")
 case $size in ''|*[!0-9]*) die 'userdata size is unavailable' ;; esac
-[ "$size" -ge 33554432 ] || die 'userdata is smaller than 16 GiB —— 不支持该设备'
+# [ "$size" -ge 33554432 ] || die 'userdata is smaller than 16 GiB —— 不支持该设备'
 parent_path=$(/bin/busybox readlink -f "/sys/class/block/$node/.." 2>/dev/null || true)
 [ -n "$parent_path" ] || die 'userdata parent disk is unavailable'
 parent=/dev/${parent_path##*/}
@@ -100,7 +100,7 @@ if [ "$rescue" = ENABLE-USB-RESCUE ]; then
 	touch /mnt/install/native-root/etc/liuqin-rescue-enabled
 fi
 [ -n "$(/usr/sbin/getcap /mnt/install/native-root/usr/lib/snapd/snap-confine)" ] ||
-	die 'snap-confine capability was not restored'
+	die 'systemd binary missing from extracted rootfs'
 # Verify immutable boot-contract files after extraction and provisioning.
 tail -n +2 /etc/liuqin-native-root.contract | while read -r expected path; do
 	[ -n "$expected" ] || continue

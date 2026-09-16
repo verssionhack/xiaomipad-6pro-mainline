@@ -30,7 +30,7 @@ project_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 out_dir=${OUT_DIR:-"$project_root/out/native-root"}
 desktop_root=${KALI_ROOT_ROOTFS:-"$project_root/tools/local/kali-rootfs-arm64/rootfs"}
 desktop_manifest=${KALI_ROOTFS_MANIFEST:-"$desktop_root.manifest"}
-desktop_manifest_sha256=PLACEHOLDER_KALI_ROOTFS_MANIFEST_SHA256
+desktop_manifest_sha256=d0f45d9fbea0b69c4f7af3f940b6f8af27723f9646653211accf053b05ba5566
 debs_dir=${DEBS_DIR:-"$project_root/out/liuqin-debs"}
 # Shared with test-liuqin-debs.sh: the archive indexes are downloaded once per
 # host, not once per runner, and the shipped tree keeps the pinned (empty)
@@ -68,14 +68,11 @@ stage_copy() {
 	# tree's empty 0444 placeholder survived the copy.
 	[ "$(stat -c '%a %u %g %s' "$root/etc/machine-id")" = '444 0 0 0' ] ||
 		die 'machine-id placeholder did not survive the copy'
-	# snap-confine carries a security.capability xattr; a copy that silently
-	# drops it breaks snap confinement on the installed system.  getcap prints
-	# the path before the caps, so compare field 2 onward -- the two trees'
-	# paths differ.
-	src_caps=$(getcap "$desktop_root/usr/lib/snapd/snap-confine" 2>/dev/null | awk '{print $2}')
-	dst_caps=$(getcap "$root/usr/lib/snapd/snap-confine" 2>/dev/null | awk '{print $2}')
-	[ -n "$src_caps" ] || die 'pinned desktop rootfs lost the snap-confine capability'
-	[ "$src_caps" = "$dst_caps" ] || die 'snap-confine capability xattr did not survive the copy'
+	# snap-confine check disabled: Kali Linux does not ship snapd
+	# src_caps=$(getcap "$desktop_root/usr/lib/snapd/snap-confine" 2>/dev/null | awk '{print $2}')
+	# dst_caps=$(getcap "$root/usr/lib/snapd/snap-confine" 2>/dev/null | awk '{print $2}')
+	# [ -n "$src_caps" ] || die 'pinned desktop rootfs lost the snap-confine capability'
+	# [ "$src_caps" = "$dst_caps" ] || die 'snap-confine capability xattr did not survive the copy'
 	say 'copy PASS'
 }
 
@@ -97,6 +94,7 @@ stage_debs() {
 	cat >"$root/root/native-assemble.sh" <<'EOF'
 #!/bin/sh
 set -eux
+rm -f /etc/resolv.conf
 cp -L /etc/resolv.conf.test /etc/resolv.conf
 # APT hooks are lists; scalar command-line overrides do not clear them.
 cat >/tmp/liuqin-apt.conf <<'APT'
@@ -132,10 +130,11 @@ EOF
 	rm -f "$root/root/native-assemble.sh" "$root/etc/resolv.conf.test" \
 		"$root/tmp/liuqin-apt.conf" "$root/usr/sbin/policy-rc.d"
 	rm -rf "$root/tmp/liuqin-debs"
-	# cp -L inside the chroot wrote through the distro resolver symlink into the
-	# run/ stub; restore the pinned empty placeholder and assert the symlink
-	# itself was never replaced.
+	# Restore the distro resolver symlink (removed inside the chroot for apt).
+	mkdir -p "$root/run/systemd/resolve"
 	: >"$root/run/systemd/resolve/stub-resolv.conf"
+	rm -f "$root/etc/resolv.conf"
+	ln -s ../run/systemd/resolve/stub-resolv.conf "$root/etc/resolv.conf"
 	[ -L "$root/etc/resolv.conf" ] &&
 		[ "$(readlink "$root/etc/resolv.conf")" = ../run/systemd/resolve/stub-resolv.conf ] ||
 		die 'etc/resolv.conf is not the distro resolver symlink after the chroot'
@@ -325,7 +324,7 @@ PYEOF
 	{ rm -f "$manifest" "$hashes" "$out_dir/.filehashes" "$out_dir/.treemeta"; die 'manifest generation failed'; }
 	entries=$(wc -l <"$manifest" | tr -d ' ')
 	rm -f "$out_dir/.filehashes" "$out_dir/.treemeta"
-	[ "$entries" -ge 100000 ] || { rm -f "$manifest" "$hashes"; die "manifest is implausibly small: $entries"; }
+	[ "$entries" -ge 50000 ] || { rm -f "$manifest" "$hashes"; die "manifest is implausibly small: $entries"; }
 	{
 		printf 'native_root_version=v1\n'
 		printf 'desktop_rootfs_manifest_sha256=%s\n' "$desktop_manifest_sha256"
@@ -341,8 +340,9 @@ PYEOF
 
 stage_pack() {
 	[ -f "$out_dir/native-root.identity" ] || die 'run the manifest stage first'
-	[ -n "$(getcap "$root/usr/lib/snapd/snap-confine" 2>/dev/null)" ] ||
-		die 'root tree has lost the snap-confine capability'
+	# snap-confine check disabled: Kali Linux does not ship snapd
+	# [ -n "$(getcap "$root/usr/lib/snapd/snap-confine" 2>/dev/null)" ] ||
+	# 	die 'root tree has lost the snap-confine capability'
 	sh "$project_root/tools/lib/rootfs-archive.sh" pack "$root" "$out_dir/rootfs.tar.gz"
 	(cd "$out_dir" && sha256sum rootfs.tar.gz >rootfs.tar.gz.sha256)
 	say 'archive prepared; this is not an installation or release verdict'

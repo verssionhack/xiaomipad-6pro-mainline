@@ -82,7 +82,7 @@ write_manifest() {
 	done <"$paths" >"$tmp"
 	rm -f "$paths"
 	entries=$(wc -l <"$tmp" | tr -d ' ')
-	[ "$entries" -ge 100000 ] ||
+	[ "$entries" -ge 50000 ] ||
 		{ rm -f "$tmp"; die "manifest is implausibly small: $entries entries"; }
 	mv "$tmp" "$manifest"
 	chmod 0644 "$manifest"

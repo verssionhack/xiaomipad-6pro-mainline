@@ -205,6 +205,7 @@ PY
 	(cd "$overlay" && find . -mindepth 1 -type f \
 		! -name README.md ! -path '*/__pycache__/*' ! -path './usr/lib/firmware/*' \
 		! -path './etc/gdm3/custom.conf' \
+		! -path './etc/dconf/profile/user' \
 		-printf '%P\n' | LC_ALL=C sort) >"$work/$pkg.files"
 	while IFS= read -r rel; do
 		[ -n "$rel" ] || continue

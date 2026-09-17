@@ -99,8 +99,12 @@ PERSIST_SRC=/run/persist sh /usr/lib/liuqin/provision.sh /mnt/install/native-roo
 if [ "$rescue" = ENABLE-USB-RESCUE ]; then
 	touch /mnt/install/native-root/etc/liuqin-rescue-enabled
 fi
-[ -n "$(/usr/sbin/getcap /mnt/install/native-root/usr/lib/snapd/snap-confine)" ] ||
+[ -x /mnt/install/native-root/usr/lib/systemd/systemd ] ||
 	die 'systemd binary missing from extracted rootfs'
+# Kali has no snapd; probe xattr preservation on a binary that ships a
+# capability set in the stock tree instead.
+[ -n "$(/usr/sbin/getcap /mnt/install/native-root/usr/lib/aarch64-linux-gnu/gstreamer1.0/gstreamer-1.0/gst-ptp-helper 2>/dev/null)" ] ||
+	die 'xattrs not preserved in extracted rootfs'
 # Verify immutable boot-contract files after extraction and provisioning.
 tail -n +2 /etc/liuqin-native-root.contract | while read -r expected path; do
 	[ -n "$expected" ] || continue

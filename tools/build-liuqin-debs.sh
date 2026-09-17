@@ -37,9 +37,27 @@ power_key_cc=${POWER_KEY_CC:-$(command -v aarch64-linux-gnu-gcc || true)}
 power_keyd_source=${POWER_KEYD_SOURCE:-"$project_root/device/power-key/liuqin-power-keyd.c"}
 uinput_automation_source=${UINPUT_AUTOMATION_SOURCE:-"$project_root/device/input/liuqin-uinput-automation.c"}
 audio_probe_source=${AUDIO_PROBE_SOURCE:-"$project_root/device/audio-topology/liuqin-audio-hwparams-probe.c"}
-power_settings_binary=${POWER_SETTINGS_BINARY:-"$project_root/out/gnome-control-center/gnome-control-center"}
-power_settings_sha256=${POWER_SETTINGS_SHA256:-}
+# The reviewed Settings build ships in the source tree (prebuilt); a rebuild
+# from tools/build-liuqin-settings.py can be substituted via the overrides.
+power_settings_binary=${POWER_SETTINGS_BINARY:-"$project_root/device/gnome-control-center/prebuilt/gnome-control-center"}
+power_settings_sha256=${POWER_SETTINGS_SHA256:-14b4147249130ef069a33d04cae4b810e46afdca6871abdfc6c521870c42d213}
 power_settings_manifest=${POWER_SETTINGS_MANIFEST:-"$project_root/out/gnome-control-center/build-info.json"}
+# The reviewed build links the Ubuntu whoopsie preference pair and the
+# ubuntu-pro insights client library; carry that closure so it resolves on
+# the Kali root.
+whoopsie_dir=$project_root/device/gnome-control-center/prebuilt
+whoopsie_core_sha256=16b5eba0098cbd7b2422d4d4a21c033a22578ec3b1d3645b081056984b40e673
+whoopsie_prefs_sha256=f35412c537b08f74785ec441cc30959afcb9cbb828374e93592130f38c30487c
+insights_sha256=e22c37fd55d95dedbfe69ce9c70c1816802f2bb4dd3029d088bca4abca64a7f2
+# The reviewed build links malcontent 0.14 symbols that the Kali 0.13 build
+# lacks; the newer library is a symbol superset, so it serves both consumers.
+malcontent_sha256=cbd014d9692870b2257096ffd5eb2d04e4d91132809b8d024c0d2ad2d3e8f02f
+# The reviewed shell model references the "ubuntu" panel; without the
+# desktop entry the model build asserts and the app bails out.
+ubuntu_panel_sha256=f6fa806c48559e7f78a1496197b00cd7e19117ec682be350b5c4d23533d2d4b4
+# Pinned compiled schema database (reviewed bytes; glib-compile-schemas output
+# is not byte-stable across host glib versions).
+power_schemas_sha256=8a2e5d1f1bcef353b9d3af47aa77bb75848fd31bd8cdfa49a3d1e83d4521357b
 # SENSOR_STACK_SHA256 selects the sensor build to include in this package set.
 sensor_stack=${SENSOR_STACK_TAR:-"$project_root/out/liuqin-sensors-stack/artifacts/sensor-stack.tar"}
 sensor_stack_sha256=${SENSOR_STACK_SHA256:-9dcb2b8cb3a6539ccd6d2b410476f3e6ebc725072a3b63089a570ebdaeec5701}
@@ -260,9 +278,39 @@ PY
 	install -D -m 0755 "$busybox" "$root/usr/local/bin/busybox"
 	if [ -f "$overlay/usr/share/liuqin/power/io.github.liuqin.power.gschema.xml" ]; then
 		install -D -m 0755 "$power_settings_binary" "$root/usr/bin/gnome-control-center"
-		command -v glib-compile-schemas >/dev/null || die 'glib-compile-schemas is required'
-		glib-compile-schemas --strict "$root/usr/share/liuqin/power"
-		chmod 0644 "$root/usr/share/liuqin/power/gschemas.compiled"
+		sha_ok "$whoopsie_dir/gnome-ubuntu-panel.desktop" "$ubuntu_panel_sha256" \
+			'ubuntu panel desktop entry identity mismatch'
+		install -D -m 0644 "$whoopsie_dir/gnome-ubuntu-panel.desktop" \
+			"$root/usr/share/applications/gnome-ubuntu-panel.desktop"
+		if [ -f "$root/usr/share/liuqin/power/gschemas.compiled" ]; then
+			# The overlay ships the reviewed compiled database; keep its exact
+			# bytes instead of regenerating with the host glib.
+			sha_ok "$root/usr/share/liuqin/power/gschemas.compiled" \
+				"$power_schemas_sha256" 'power-panel schema database identity mismatch'
+		else
+			command -v glib-compile-schemas >/dev/null || die 'glib-compile-schemas is required'
+			glib-compile-schemas --strict "$root/usr/share/liuqin/power"
+			chmod 0644 "$root/usr/share/liuqin/power/gschemas.compiled"
+		fi
+		sha_ok "$whoopsie_dir/libwhoopsie.so.0.0" "$whoopsie_core_sha256" \
+			'whoopsie closure identity mismatch'
+		sha_ok "$whoopsie_dir/libwhoopsie-preferences.so.0.0.0" \
+			"$whoopsie_prefs_sha256" 'whoopsie closure identity mismatch'
+		sha_ok "$whoopsie_dir/libinsights.so.0" "$insights_sha256" \
+			'insights closure identity mismatch'
+		install -D -m 0644 "$whoopsie_dir/libwhoopsie.so.0.0" \
+			"$root/usr/lib/aarch64-linux-gnu/libwhoopsie.so.0.0"
+		ln -sfn libwhoopsie.so.0.0 "$root/usr/lib/aarch64-linux-gnu/libwhoopsie.so.0"
+		install -D -m 0644 "$whoopsie_dir/libwhoopsie-preferences.so.0.0.0" \
+			"$root/usr/lib/aarch64-linux-gnu/libwhoopsie-preferences.so.0.0.0"
+		ln -sfn libwhoopsie-preferences.so.0.0.0 \
+			"$root/usr/lib/aarch64-linux-gnu/libwhoopsie-preferences.so.0"
+		install -D -m 0644 "$whoopsie_dir/libinsights.so.0" \
+			"$root/usr/lib/aarch64-linux-gnu/libinsights.so.0"
+		sha_ok "$whoopsie_dir/libmalcontent-0.so.0.14.0" "$malcontent_sha256" \
+			'malcontent closure identity mismatch'
+		install -D -m 0644 "$whoopsie_dir/libmalcontent-0.so.0.14.0" \
+			"$root/usr/lib/aarch64-linux-gnu/libmalcontent-0.so.0.14.0"
 	fi
 	mkdir -p "$root/DEBIAN"
 	write_divert_preinst "$pkg" /usr/bin/gnome-control-center

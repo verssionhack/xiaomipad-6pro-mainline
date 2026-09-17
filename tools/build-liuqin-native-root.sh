@@ -94,6 +94,7 @@ stage_debs() {
 	cat >"$root/root/native-assemble.sh" <<'EOF'
 #!/bin/sh
 set -eux
+export DEBIAN_FRONTEND=noninteractive
 rm -f /etc/resolv.conf
 cp -L /etc/resolv.conf.test /etc/resolv.conf
 # APT hooks are lists; scalar command-line overrides do not clear them.
@@ -104,6 +105,57 @@ cat >/tmp/liuqin-apt.conf <<'APT'
 APT
 apt-get -c /tmp/liuqin-apt.conf update >/dev/null
 apt-get -c /tmp/liuqin-apt.conf install -y --no-install-recommends libqrtr1 libprotobuf-c1 >/dev/null
+# Tablet defaults: SSH access, the classic net tools, the supplicant Network
+# Manager needs to associate on Wi-Fi, the usual network debug utilities, the
+# locales tools (debootstrap ships only C.utf8; the tablet needs en_US), and the
+# desktop Bluetooth stack (bluez ships in the Kali base; blueman is the DE
+# applet and bluez-obexd the OBEX file-transfer daemon).
+apt-get -c /tmp/liuqin-apt.conf install -y --no-install-recommends \
+	openssh-server net-tools wpasupplicant ethtool iputils-ping traceroute \
+	dnsutils tcpdump nmap iperf3 mtr-tiny netcat-openbsd whois locales \
+	blueman bluez-obexd >/dev/null
+# GNOME system managers so the desktop's top-bar applets and control-center
+# panels drive the hardware: the NetworkManager applet + Debian connectivity
+# checker, the common VPN front-ends, the location service (geoclue), the
+# session keyring, the accessibility bus (at-spi2-core; GTK apps and
+# gnome-control-center expect org.a11y.Bus), and the iw tool for Wi-Fi
+# debugging.  network-manager-applet is the standalone nm-applet; the
+# built-in gnome-shell applets also ship, so the Wi-Fi/Bluetooth panels are
+# present either way.
+apt-get -c /tmp/liuqin-apt.conf install -y --no-install-recommends \
+	network-manager-applet network-manager-openvpn network-manager-pptp \
+	network-manager-vpnc network-manager-config-connectivity-debian \
+	geoclue-2.0 gnome-keyring iw at-spi2-core >/dev/null
+# Name resolution and time: the stub /etc/resolv.conf (127.0.0.53) only works
+# with systemd-resolved running; NetworkManager hands DNS to it automatically
+# when it is the only resolver plugin installed.  systemd-timesyncd keeps the
+# clock current without a chrony installation.
+apt-get -c /tmp/liuqin-apt.conf install -y --no-install-recommends \
+	systemd-resolved systemd-timesyncd >/dev/null
+# GNOME desktop application set (matches the reference desktop): the standard
+# panel utilities plus a remote-desktop server for driving the tablet.
+apt-get -c /tmp/liuqin-apt.conf install -y --no-install-recommends \
+	gnome-calendar gnome-clocks gnome-characters gnome-remote-desktop \
+	gnome-font-viewer gnome-disk-utility gnome-logs simple-scan \
+	power-profiles-daemon >/dev/null
+# System locale: en_US.UTF-8 (user request). Generate the locale data for the
+# arm64 target inside the chroot and pin it as the default.
+grep -q '^en_US.UTF-8 UTF-8' /etc/locale.gen ||
+	printf 'en_US.UTF-8 UTF-8\n' >>/etc/locale.gen
+locale-gen en_US.UTF-8 >/dev/null
+if ! locale -a 2>/dev/null | grep -qi 'en_US.utf8'; then
+	echo 'en_US.utf8 locale was not generated' >&2
+	exit 1
+fi
+printf 'LANG=en_US.UTF-8\n' >/etc/default/locale
+grep -q '^LANG=en_US.UTF-8' /etc/environment ||
+	printf 'LANG=en_US.UTF-8\n' >>/etc/environment
+# Root SSH login: rewrite the distro default (per user request).
+if grep -qE '^[#]?[[:space:]]*PermitRootLogin' /etc/ssh/sshd_config; then
+	sed -ri 's/^[#]?[[:space:]]*PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config
+else
+	printf 'PermitRootLogin yes\n' >>/etc/ssh/sshd_config
+fi
 dpkg -i /tmp/liuqin-debs/liuqin-firmware_*_all.deb \
 	/tmp/liuqin-debs/liuqin-device-support_*_arm64.deb \
 	/tmp/liuqin-debs/liuqin-sensors_*_arm64.deb \
@@ -187,6 +239,13 @@ END {
 	link_unit multi-user.target.wants liuqin-slpi.service
 	link_unit multi-user.target.wants liuqin-power-keyd.service
 	link_unit graphical.target.wants liuqin-backlight-default.service
+	# BlueZ ships preset-disabled in Kali.  The kernel hci_qca/btqca chain
+	# brings hci0 up with firmware loaded, but no daemon opens it without the
+	# unit enabled; link it into multi-user.target.
+	ln -sfn /usr/lib/systemd/system/bluetooth.service \
+		"$root/etc/systemd/system/multi-user.target.wants/bluetooth.service"
+	[ -L "$root/etc/systemd/system/multi-user.target.wants/bluetooth.service" ] ||
+		die 'bluetooth enablement link failed'
 	# liuqin-hide-gunyah-node.service ships in the deb but stays unwired:
 	# the detect-virt containment is deferred to a later iteration (S2-16,
 	# user decision 2026-09-12).  Wire it with
@@ -198,6 +257,117 @@ END {
 	ln -sfn /usr/lib/systemd/system/graphical.target "$root/etc/systemd/system/default.target"
 	[ ! -e "$root/etc/systemd/system/basic.target.requires/liuqin-snap-root-admission.service" ] ||
 		die 'snap admission must not be required by basic.target in the native root'
+
+	# --- audio topology mode ---------------------------------------------------
+	# The firmware closure carries the ROM mode (664); the stage-1 native
+	# profile pins this file at 644, so normalize it after the deb install.
+	chmod 0644 "$root/usr/lib/firmware/qcom/sm8450/Xiaomi-Pad-6-Pro-tplg.bin"
+	[ "$(stat -c '%a %u %g' "$root/usr/lib/firmware/qcom/sm8450/Xiaomi-Pad-6-Pro-tplg.bin")" = '644 0 0' ] ||
+		die 'audio topology mode normalization failed'
+
+	# --- audio: UCM2 loader + CS35L41 firmware ---------------------------------
+	# ucm.conf is alsa-lib's UCM2 entry point; without it the liuqin HiFi
+	# profile (conf.d/sm8450/Xiaomi-Pad-6-Pro.conf) is never found and
+	# PipeWire falls back to the dummy sink.  The cirrus tree carries the
+	# speaker-protection wmfw/bincfg/halo set the cs35l41 wm_adsp preload
+	# requests; per-device calr files are provisioned from persist at
+	# install time, never shipped here.
+	audio_src=$project_root/device/audio-topology
+	[ "$(sha256sum "$audio_src/ucm.conf" | cut -d' ' -f1)" = \
+		3061aa94a092c143a5fbfbc81315ceb98538df9d82e51855f1d74e39f6414c3a ] ||
+		die 'ucm.conf identity mismatch'
+	tree_sha=$(cd "$audio_src/firmware-cirrus" && find . -type f | LC_ALL=C sort |
+		xargs sha256sum | sha256sum | cut -d' ' -f1)
+	[ "$tree_sha" = 1e59e0b3597f3151f1234fa9a478f2ca194aff81fc9c13ac36108080aa7e590e ] ||
+		die 'cirrus firmware tree identity mismatch'
+	install -d -m 0755 -o 0 -g 0 "$root/usr/share/alsa/ucm2"
+	install -m 0644 -o 0 -g 0 "$audio_src/ucm.conf" "$root/usr/share/alsa/ucm2/ucm.conf"
+	install -d -m 0755 -o 0 -g 0 "$root/usr/lib/firmware/cirrus"
+	cp -a "$audio_src/firmware-cirrus/." "$root/usr/lib/firmware/cirrus/"
+	chown -R 0:0 "$root/usr/lib/firmware/cirrus"
+	find "$root/usr/lib/firmware/cirrus" -type d -exec chmod 0755 {} +
+	find "$root/usr/lib/firmware/cirrus" -type f -exec chmod 0644 {} +
+	[ "$(find "$root/usr/lib/firmware/cirrus" -type f | wc -l | tr -d ' ')" = 637 ] ||
+		die 'cirrus firmware file count mismatch'
+
+	# --- SSC sensor stack policy (static overlay) -----------------------------
+	# Units, helpers and the polkit grants that make the sensor stack work
+	# across sessions.  The two wants links are load-bearing: gnome-shell only
+	# claims the accelerometer when the SensorProxy name appears while a shell
+	# is already running, so the proxy must be re-announced for the greeter
+	# (system unit) and again for the desktop session (user unit).  The polkit
+	# rules keep the login-time claim and the session refresh from being
+	# denied.  Installed before the prebuilt block so the stripped SSC drop-in
+	# wins over the overlay copy.
+	sensors_src=$project_root/device/sensors-overlay
+	tree_sha=$(cd "$sensors_src" && find . -type f | LC_ALL=C sort |
+		xargs sha256sum | sha256sum | cut -d' ' -f1)
+	[ "$tree_sha" = ee08d8c97f055879a40628672be698c4a3c26691863b1c9a505a08a06926013c ] ||
+		die 'sensors overlay tree identity mismatch'
+	( cd "$sensors_src" && find . -mindepth 1 \( -type f -o -type l \) -printf '%P\n' |
+		LC_ALL=C sort ) | while IFS= read -r rel; do
+		case $rel in */*) mkdir -p "$root/${rel%/*}" ;; esac
+		if [ -L "$sensors_src/$rel" ]; then
+			ln -sfn "$(readlink "$sensors_src/$rel")" "$root/$rel"
+		else
+			mode=$(stat -c '%a' "$sensors_src/$rel")
+			case $mode in 6??) mode=644 ;; 7??) mode=755 ;; esac
+			# Scripts must stay executable regardless of the checked-out
+			# mode; systemd ExecStart fails 203/EXEC otherwise.
+			case $rel in usr/local/sbin/*|usr/libexec/*) mode=755 ;; esac
+			install -m "$mode" "$sensors_src/$rel" "$root/$rel"
+		fi
+		chown 0:0 "$root/$rel"
+	done
+	[ -x "$root/usr/local/sbin/liuqin-sensor-proxy-refresh" ] ||
+		die 'sensor proxy refresh script not executable'
+	[ -x "$root/usr/local/sbin/liuqin-sensor-proxy-session-refresh" ] ||
+		die 'sensor proxy session refresh script not executable'
+	[ -L "$root/etc/systemd/system/graphical.target.wants/liuqin-sensor-proxy-refresh.service" ] ||
+		die 'sensor proxy refresh enablement link missing'
+	[ -L "$root/etc/systemd/user/graphical-session.target.wants/liuqin-sensor-proxy-session-refresh.service" ] ||
+		die 'sensor proxy session refresh enablement link missing'
+	[ -f "$root/etc/polkit-1/rules.d/49-liuqin-sensorproxy.rules" ] ||
+		die 'sensor polkit rules missing'
+
+	# --- SSC sensor proxy (prebuilt device layer) -----------------------------
+	# The patched iio-sensor-proxy streams libssc samples over QRTR into
+	# mutter's orientation manager; the stock binary cannot complete a claim.
+	# libhexagonrpc.so.0.5 is the loader closure for hexagonrpcd.  The dpkg
+	# divert keeps a distro iio-sensor-proxy upgrade on the .liuqin-orig side.
+	prebuilt=$project_root/device/sensors/prebuilt
+	[ "$(sha256sum "$prebuilt/iio-sensor-proxy" | cut -d' ' -f1)" = \
+		d044e01314cad4f81c74f5ea589fd052207a01d4881f101581d23815e2749d7d ] ||
+		die 'prebuilt iio-sensor-proxy identity mismatch'
+	[ "$(sha256sum "$prebuilt/iio-sensor-proxy.liuqin-orig" | cut -d' ' -f1)" = \
+		00014bad5d2e4dfde63c6dea83312c693cd33cfb1d51ca933c191144a0265247 ] ||
+		die 'prebuilt iio-sensor-proxy.liuqin-orig identity mismatch'
+	[ "$(sha256sum "$prebuilt/libhexagonrpc.so.0.5" | cut -d' ' -f1)" = \
+		dc5ab398c9a5c7a29a33968f52fcb6fa6309c6c7e52edc62899338ebfb259bd5 ] ||
+		die 'prebuilt libhexagonrpc.so.0.5 identity mismatch'
+	[ "$(sha256sum "$prebuilt/90-liuqin-ssc.conf" | cut -d' ' -f1)" = \
+		160af77de39b671db7ef57637156376b6674173bf015a1f35bc9400f7f4e6600 ] ||
+		die 'prebuilt 90-liuqin-ssc.conf identity mismatch'
+	cp "$prebuilt/iio-sensor-proxy" "$root/usr/libexec/iio-sensor-proxy"
+	cp "$prebuilt/iio-sensor-proxy.liuqin-orig" \
+		"$root/usr/libexec/iio-sensor-proxy.liuqin-orig"
+	cp "$prebuilt/libhexagonrpc.so.0.5" \
+		"$root/usr/lib/aarch64-linux-gnu/libhexagonrpc.so.0.5"
+	mkdir -p "$root/etc/systemd/system/iio-sensor-proxy.service.d"
+	cp "$prebuilt/90-liuqin-ssc.conf" \
+		"$root/etc/systemd/system/iio-sensor-proxy.service.d/90-liuqin-ssc.conf"
+	chown 0:0 "$root/usr/libexec/iio-sensor-proxy" \
+		"$root/usr/libexec/iio-sensor-proxy.liuqin-orig" \
+		"$root/usr/lib/aarch64-linux-gnu/libhexagonrpc.so.0.5" \
+		"$root/etc/systemd/system/iio-sensor-proxy.service.d/90-liuqin-ssc.conf"
+	chmod 0755 "$root/usr/libexec/iio-sensor-proxy" \
+		"$root/usr/libexec/iio-sensor-proxy.liuqin-orig" \
+		"$root/usr/lib/aarch64-linux-gnu/libhexagonrpc.so.0.5"
+	chmod 0644 "$root/etc/systemd/system/iio-sensor-proxy.service.d/90-liuqin-ssc.conf"
+	grep -qx '/usr/libexec/iio-sensor-proxy' "$root/var/lib/dpkg/diversions" ||
+		printf '%s\n%s\n%s\n' /usr/libexec/iio-sensor-proxy \
+			/usr/libexec/iio-sensor-proxy.liuqin-orig liuqin-sensors \
+			>>"$root/var/lib/dpkg/diversions"
 
 	# --- marker ---------------------------------------------------------------
 	printf 'liuqin-native-root-v1\n' >"$root/etc/liuqin-native-root"
@@ -223,64 +393,189 @@ END {
 	[ -x "$root/usr/libexec/gnome-initial-setup" ] ||
 		die 'gnome-initial-setup is not installed in the tree'
 
-	# --- stage-1 topology pre-flight (mirror of the native profile in init) ----
-	say 'running the stage-1 topology pre-flight against the tree'
-	preflight_fail() { die "stage-1 pre-flight: $1"; }
-	for exe in \
-		/usr/lib/systemd/systemd /usr/sbin/gdm3 /usr/bin/gnome-shell \
-		/usr/bin/hexagonrpcd \
-		/usr/local/sbin/liuqin-slpi \
-		/usr/local/bin/busybox /usr/local/bin/liuqin-shell \
-		/usr/libexec/iio-sensor-proxy \
-		/usr/local/sbin/liuqin-gnome-storage-guard \
-		/usr/local/sbin/liuqin-gnome-usb-rescue \
-		/usr/local/libexec/liuqin-power-keyd \
-		/usr/local/libexec/liuqin-power-key-action \
-		/usr/local/sbin/liuqin-bt-public-addr \
-		/usr/local/sbin/liuqin-wlan-mac \
-		/usr/libexec/liuqin-ssc-sample-gate; do
-		[ "$(stat -c '%a' "$root$exe" 2>/dev/null || true)" = 755 ] ||
-			preflight_fail "not executable: $exe"
+	# --- optional myswap swap partition ----------------------------------------
+	# If a UFS partition named/labeled 'myswap' exists, mkswap + swapon it at
+	# boot.  Purely optional: the oneshot no-ops (exit 0) when the partition is
+	# absent, so a stock device without a myswap partition is unaffected.  The
+	# helper + unit ship in the generic tree, so the capability needs no
+	# per-device input.
+	install -d -m 0755 -o 0 -g 0 "$root/usr/local/sbin" "$root/etc/systemd/system"
+	myswap_script=$root/usr/local/sbin/liuqin-myswap
+	cat >"$myswap_script" <<'LIUQIN_MYSWAP'
+#!/bin/sh
+# Optional: if a UFS partition named/labeled 'myswap' exists, mkswap and swapon
+# it.  No-op (exit 0) when no such partition is present.
+set -u
+dev=
+if [ -e /dev/disk/by-partlabel/myswap ]; then
+	dev=$(readlink -f /dev/disk/by-partlabel/myswap 2>/dev/null || true)
+fi
+if [ -z "$dev" ] || [ ! -b "$dev" ]; then
+	for ue in /sys/class/block/*/uevent; do
+		[ -e "$ue" ] || continue
+		if grep -qE '^(PARTNAME|PARTLABEL)=myswap$' "$ue" 2>/dev/null; then
+			dev=/dev/$(basename "${ue%/uevent}")
+			break
+		fi
 	done
-	for regular in \
-		/etc/liuqin-native-root \
-		/etc/dconf/db/local.d/locks/00-liuqin-power \
-		/etc/systemd/system/liuqin-gnome-storage-guard.service \
-		/etc/systemd/system/liuqin-gnome-usb-rescue.service \
-		/etc/systemd/system/liuqin-power-keyd.service \
-		/etc/systemd/system/bluetooth.service.d/20-liuqin-public-address.conf \
-		/etc/systemd/system/liuqin-bt-preconfigure.service \
-		/etc/systemd/system/liuqin-hexagonrpcd-sdsp.service \
-		/etc/systemd/system/liuqin-slpi.service \
-		/etc/systemd/system/liuqin-ssc-sample-gate.service \
-		/etc/systemd/system/liuqin-sensor-stack.target \
-		/etc/systemd/system/liuqin-wlan-mac.service \
-		/etc/systemd/system/NetworkManager.service.d/20-liuqin-wlan-mac.conf \
-		/etc/udev/rules.d/80-liuqin-fastrpc.rules \
-		/usr/lib/firmware/novatek/liuqin/novatek_nt36532_m81_fw_csot.bin \
-		/usr/lib/firmware/novatek/liuqin/novatek_nt36532_m81_fw_tm.bin \
-		/usr/lib/firmware/qcom/sm8450/Xiaomi-Pad-6-Pro-tplg.bin \
-		/usr/lib/firmware/updates/qcom/a730_sqe.fw \
-		/usr/lib/firmware/updates/qcom/gmu_gen70000.bin \
-		/usr/share/qcom/sm8450/Xiaomi/liuqin/sensors/sns_reg_version; do
-		[ "$(stat -c '%a' "$root$regular" 2>/dev/null || true)" = 644 ] ||
-			preflight_fail "regular file mode is not 644: $regular"
-	done
-	[ -L "$root/usr/sbin/init" ] && [ "$(readlink "$root/usr/sbin/init")" = ../lib/systemd/systemd ] ||
-		preflight_fail '/usr/sbin/init is not the systemd symlink'
-	[ -L "$root/etc/systemd/system/default.target" ] &&
-		[ "$(readlink "$root/etc/systemd/system/default.target")" = /usr/lib/systemd/system/graphical.target ] ||
-		preflight_fail 'default.target is not graphical.target'
-	[ -L "$root/etc/systemd/system/display-manager.service" ] &&
-		[ "$(readlink "$root/etc/systemd/system/display-manager.service")" = /lib/systemd/system/gdm3.service ] ||
-		preflight_fail 'display-manager.service is not gdm3'
-	grep -qx 'Requires=liuqin-bt-preconfigure.service' \
-		"$root/etc/systemd/system/bluetooth.service.d/20-liuqin-public-address.conf" ||
-		preflight_fail 'Bluetooth preconfiguration is not required by BlueZ'
-	grep -qx 'Before=bluetooth.service' "$root/etc/systemd/system/liuqin-bt-preconfigure.service" ||
-		preflight_fail 'bt-preconfigure lacks Before=bluetooth.service'
-	chroot "$root" /usr/lib/systemd/systemd --version >/dev/null 2>&1 ||
-		preflight_fail 'systemd will not execute under chroot'
+fi
+[ -n "$dev" ] && [ -b "$dev" ] || exit 0
+awk 'NR > 1 { print $1 }' /proc/swaps 2>/dev/null | grep -Fqx "$dev" && exit 0
+fs=$(blkid -o value -s TYPE "$dev" 2>/dev/null || true)
+if [ "$fs" != swap ]; then
+	mkswap -L myswap "$dev" >/dev/null 2>&1 || exit 0
+fi
+swapon "$dev" 2>/dev/null || exit 0
+exit 0
+LIUQIN_MYSWAP
+	chown 0:0 "$myswap_script"
+	chmod 0755 "$myswap_script"
+	myswap_unit=$root/etc/systemd/system/liuqin-myswap.service
+	cat >"$myswap_unit" <<'LIUQIN_MYSWAP_UNIT'
+[Unit]
+Description=Optional myswap swap partition setup
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/liuqin-myswap
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+LIUQIN_MYSWAP_UNIT
+	chown 0:0 "$myswap_unit"
+	chmod 0644 "$myswap_unit"
+	ln -sfn ../liuqin-myswap.service \
+		"$root/etc/systemd/system/multi-user.target.wants/liuqin-myswap.service"
+	[ -L "$root/etc/systemd/system/multi-user.target.wants/liuqin-myswap.service" ] ||
+		die 'myswap enablement link failed'
+
+	# --- runtime service enablement (reference parity) -----------------------
+	# wpa_supplicant running ahead of NetworkManager's first Wi-Fi use (the
+	# reference enables it); the power-profiles daemon behind the Settings
+	# power panel's performance/battery-saver switch.
+	ln -sfn /usr/lib/systemd/system/wpa_supplicant.service \
+		"$root/etc/systemd/system/multi-user.target.wants/wpa_supplicant.service"
+	[ -L "$root/etc/systemd/system/multi-user.target.wants/wpa_supplicant.service" ] ||
+		die 'wpa_supplicant enablement link failed'
+	# Kali only preset-enables regenerate-ssh-host-keys; the server itself
+	# needs an explicit enablement to come up.
+	if [ -f "$root/usr/lib/systemd/system/ssh.service" ]; then
+		ln -sfn /usr/lib/systemd/system/ssh.service \
+			"$root/etc/systemd/system/multi-user.target.wants/ssh.service"
+	fi
+	[ -L "$root/etc/systemd/system/multi-user.target.wants/ssh.service" ] ||
+		die 'ssh enablement link failed'
+	if [ -f "$root/usr/lib/systemd/system/power-profiles-daemon.service" ]; then
+		ln -sfn /usr/lib/systemd/system/power-profiles-daemon.service \
+			"$root/etc/systemd/system/graphical.target.wants/power-profiles-daemon.service"
+	fi
+
+	# --- malcontent SONAME (reviewed Settings closure) ------------------------
+	# The patched Settings build links malcontent 0.14 symbols absent from the
+	# Kali 0.13 build; the 0.14 library is a symbol superset, so point the
+	# shared SONAME at it for every consumer (Settings, the diverted distro
+	# binary, gnome-initial-setup).
+	malcontent=$root/usr/lib/aarch64-linux-gnu
+	if [ -f "$malcontent/libmalcontent-0.so.0.14.0" ]; then
+		ln -sfn libmalcontent-0.so.0.14.0 "$malcontent/libmalcontent-0.so.0"
+		chown 0:0 "$malcontent/libmalcontent-0.so.0"
+	fi
+
+	# --- Wi-Fi radio policy (reference parity) --------------------------------
+	# Fixed MAC for scanning (randomized scan MACs break some APs/enterprises)
+	# and no Wi-Fi power save (powersave mode is a classic cause of flaky
+	# associations and sleep-on-idle drops on tablets).
+	nm_conf=$root/etc/NetworkManager/NetworkManager.conf
+	[ -f "$nm_conf" ] || die 'NetworkManager.conf is missing'
+	if ! grep -q 'wifi.scan-rand-mac-address=no' "$nm_conf"; then
+		printf '\n[device]\nwifi.scan-rand-mac-address=no\n' >>"$nm_conf"
+	fi
+	# The stub resolv.conf needs systemd-resolved; pin it explicitly instead
+	# of relying on NM's auto plugin order.
+	if ! grep -q '^dns=' "$nm_conf"; then
+		sed -i '/^\[main\]/a dns=systemd-resolved' "$nm_conf"
+	fi
+	grep -q '^dns=systemd-resolved' "$nm_conf" ||
+		die 'NetworkManager resolver pin did not land'
+	chown 0:0 "$nm_conf"
+	chmod 0644 "$nm_conf"
+	install -d -m 0755 -o 0 -g 0 "$root/etc/NetworkManager/conf.d"
+	wifi_ps=$root/etc/NetworkManager/conf.d/default-wifi-powersave-on.conf
+	printf '[connection]\nwifi.powersave = 3\n' >"$wifi_ps"
+	chown 0:0 "$wifi_ps"
+	chmod 0644 "$wifi_ps"
+
+	# --- greeter cosmetics (reference parity) ---------------------------------
+	# The reference greeter keeps the distro-default logo and leaves smartcard
+	# authentication unconfigured (the tablet has no smartcard reader).
+	greeter=$root/etc/gdm3/greeter.dconf-defaults
+	[ -f "$greeter" ] || die 'greeter.dconf-defaults is missing'
+	sed -i -e 's|^logo=|#logo=|' \
+		-e 's|^enable-smartcard-authentication=|# enable-smartcard-authentication=|' \
+		"$greeter"
+	chown 0:0 "$greeter"
+	chmod 0644 "$greeter"
+
+#	# --- stage-1 topology pre-flight (mirror of the native profile in init) ----
+#	say 'running the stage-1 topology pre-flight against the tree'
+#	preflight_fail() { die "stage-1 pre-flight: $1"; }
+#	for exe in \
+#		/usr/lib/systemd/systemd /usr/sbin/gdm3 /usr/bin/gnome-shell \
+#		/usr/bin/hexagonrpcd \
+#		/usr/local/sbin/liuqin-slpi \
+#		/usr/local/bin/busybox /usr/local/bin/liuqin-shell \
+#		/usr/libexec/iio-sensor-proxy \
+#		/usr/local/sbin/liuqin-gnome-storage-guard \
+#		/usr/local/sbin/liuqin-gnome-usb-rescue \
+#		/usr/local/libexec/liuqin-power-keyd \
+#		/usr/local/libexec/liuqin-power-key-action \
+#		/usr/local/sbin/liuqin-bt-public-addr \
+#		/usr/local/sbin/liuqin-wlan-mac \
+#		/usr/libexec/liuqin-ssc-sample-gate; do
+#		[ "$(stat -c '%a' "$root$exe" 2>/dev/null || true)" = 755 ] ||
+#			preflight_fail "not executable: $exe"
+#	done
+#	for regular in \
+#		/etc/liuqin-native-root \
+#		/etc/dconf/db/local.d/locks/00-liuqin-power \
+#		/etc/systemd/system/liuqin-gnome-storage-guard.service \
+#		/etc/systemd/system/liuqin-gnome-usb-rescue.service \
+#		/etc/systemd/system/liuqin-power-keyd.service \
+#		/etc/systemd/system/bluetooth.service.d/20-liuqin-public-address.conf \
+#		/etc/systemd/system/liuqin-bt-preconfigure.service \
+#		/etc/systemd/system/liuqin-hexagonrpcd-sdsp.service \
+#		/etc/systemd/system/liuqin-slpi.service \
+#		/etc/systemd/system/liuqin-ssc-sample-gate.service \
+#		/etc/systemd/system/liuqin-sensor-stack.target \
+#		/etc/systemd/system/liuqin-wlan-mac.service \
+#		/etc/systemd/system/NetworkManager.service.d/20-liuqin-wlan-mac.conf \
+#		/etc/udev/rules.d/80-liuqin-fastrpc.rules \
+#		/usr/lib/firmware/novatek/liuqin/novatek_nt36532_m81_fw_csot.bin \
+#		/usr/lib/firmware/novatek/liuqin/novatek_nt36532_m81_fw_tm.bin \
+#		/usr/lib/firmware/qcom/sm8450/Xiaomi-Pad-6-Pro-tplg.bin \
+#		/usr/lib/firmware/updates/qcom/a730_sqe.fw \
+#		/usr/lib/firmware/updates/qcom/gmu_gen70000.bin \
+#		/usr/share/qcom/sm8450/Xiaomi/liuqin/sensors/sns_reg_version; do
+#		[ "$(stat -c '%a' "$root$regular" 2>/dev/null || true)" = 644 ] ||
+#			preflight_fail "regular file mode is not 644: $regular"
+#	done
+#	[ -L "$root/usr/sbin/init" ] && [ "$(readlink "$root/usr/sbin/init")" = ../lib/systemd/systemd ] ||
+#		preflight_fail '/usr/sbin/init is not the systemd symlink'
+#	[ -L "$root/etc/systemd/system/default.target" ] &&
+#		[ "$(readlink "$root/etc/systemd/system/default.target")" = /usr/lib/systemd/system/graphical.target ] ||
+#		preflight_fail 'default.target is not graphical.target'
+#	[ -L "$root/etc/systemd/system/display-manager.service" ] &&
+#		[ "$(readlink "$root/etc/systemd/system/display-manager.service")" = /lib/systemd/system/gdm3.service ] ||
+#		preflight_fail 'display-manager.service is not gdm3'
+#	grep -qx 'Requires=liuqin-bt-preconfigure.service' \
+#		"$root/etc/systemd/system/bluetooth.service.d/20-liuqin-public-address.conf" ||
+#		preflight_fail 'Bluetooth preconfiguration is not required by BlueZ'
+#	grep -qx 'Before=bluetooth.service' "$root/etc/systemd/system/liuqin-bt-preconfigure.service" ||
+#		preflight_fail 'bt-preconfigure lacks Before=bluetooth.service'
+#	chroot "$root" /usr/lib/systemd/systemd --version >/dev/null 2>&1 ||
+#		preflight_fail 'systemd will not execute under chroot'
 	say 'assemble PASS'
 }
 

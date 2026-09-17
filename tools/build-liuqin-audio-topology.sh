@@ -56,6 +56,26 @@ awk -v expected="$expected_mid" '
 grep -Fq "'TERTIARY_TDM_RX_0 Audio Mixer, MultiMedia1, stream0.logger1'" \
 	"$tmp/candidate.decoded.conf" || die 'route is missing'
 
+# Mic capture path: MultiMedia2 Capture FE, codec-DMA source module
+# 0x07001024 (decimal 117444644) on TX_CODEC_DMA_TX_3 (DAI id 120), plus its
+# mixer switch and route.  The capture subgraph must not introduce a second
+# unified Audio-IF sink; the legacy-rewrite count above already fails closed
+# if that ever changes.
+capture_mid=117444644
+awk -v expected="$capture_mid" '
+	$1 == "token200" && $2 == expected { count++ }
+	END { exit count == 1 ? 0 : 1 }
+' "$tmp/candidate.decoded.conf" ||
+	die 'decoded topology lacks exactly one codec-DMA capture MID'
+for capture_value in \
+	"stream_name 'MultiMedia2 Capture'" \
+	"stream_name 'TX_CODEC_DMA_TX_3 Capture'" \
+	"'device120.codec_dma_tx1, , TX_CODEC_DMA_TX_3 Capture'" \
+	"'MultiMedia2 Mixer, TX_CODEC_DMA_TX_3, device120.logger1'"; do
+	grep -Fq "$capture_value" "$tmp/candidate.decoded.conf" ||
+		die "decoded topology lacks capture element: $capture_value"
+done
+
 mkdir -p "$(dirname -- "$output")"
 install -m 0644 "$tmp/candidate.bin" "$output"
 printf 'source_commit=%s\n' "$expected_commit"

@@ -36,3 +36,26 @@ STREAM_DEVICE_PLAYBACK_MIXER(TERTIARY_TDM_RX_0,
 STREAM_DEVICE_PLAYBACK_ROUTE(TERTIARY_TDM_RX_0,
 	``TERTIARY_TDM_RX_0 Audio Mixer'',
 	``MultiMedia1, stream0.logger1'')
+dnl Onboard mic capture: four analog MEMS mics on WCD938x AMIC1/3/4/5,
+dnl SoundWire TX into the TX macro, captured by the ADSP via
+dnl TX_CODEC_DMA_TX_3.  The codec-DMA source module (0x07001024) has
+dnl calibration records in the vendor ACDB, so unlike the TDM sink no
+dnl legacy MID rewrite is needed here.
+STREAM_SG_PCM_ADD(`audioreach/subgraph-stream-capture.m4',
+	FRONTEND_DAI_MULTIMEDIA2,
+	`S16_LE', 48000, 48000, 1, 2,
+	0x00004011, 0x00004011, 0x00006011, `110000')
+
+DEVICE_SG_ADD(`audioreach/subgraph-device-codec-dma-capture.m4',
+	`TX_CODEC_DMA_TX_3', TX_CODEC_DMA_TX_3,
+	`S16_LE', 48000, 48000, 1, 2,
+	LPAIF_INTF_TYPE_RXTX, CODEC_INTF_IDX_TX3, 0, DATA_FORMAT_FIXED_POINT,
+	0x00004012, 0x00004012, 0x00006031)
+
+STREAM_DEVICE_CAPTURE_MIXER(FRONTEND_DAI_MULTIMEDIA2,
+	``TX_CODEC_DMA_TX_3'')
+
+STREAM_DEVICE_CAPTURE_ROUTE(FRONTEND_DAI_MULTIMEDIA2,
+	``MultiMedia2 Mixer'',
+	``TX_CODEC_DMA_TX_3, device120.logger1'')
+

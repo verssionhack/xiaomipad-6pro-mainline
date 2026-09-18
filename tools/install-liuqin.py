@@ -83,13 +83,16 @@ def main():
     if manifest['status'] != 'DEVICE_TESTED' and not args.allow_unverified:
         parser.error('bundle has not passed device testing; use --allow-unverified only for attended tests'
                      ' —— 该包未通过真机验证，请勿用于正式安装')
-    if not all((args.serial, args.backup, args.erase_userdata)):
-        parser.error('--serial, --backup and --erase-userdata are required')
-    if args.backup.exists():
-        parser.error('--backup must be a new directory')
-    args.backup = args.backup.resolve()
-    if args.backup == bundle or bundle in args.backup.parents:
-        parser.error('private backups must be outside the served bundle directory')
+    if not all((args.serial, args.erase_userdata)):
+        parser.error('--serial and --erase-userdata are required')
+    # --backup is optional: the userdata backup is not currently performed, so a
+    # clean erase needs no backup directory. When supplied, it is still validated.
+    if args.backup is not None:
+        if args.backup.exists():
+            parser.error('--backup must be a new directory')
+        args.backup = args.backup.resolve()
+        if args.backup == bundle or bundle in args.backup.parents:
+            parser.error('private backups must be outside the served bundle directory')
     if args.host_address:
         socket.inet_pton(socket.AF_INET, args.host_address)
     socket.inet_pton(socket.AF_INET, args.device_address)

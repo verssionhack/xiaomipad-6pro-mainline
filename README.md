@@ -78,7 +78,7 @@ and device trees; other batches, capacities and accessory combinations are not i
 | Feature | Component / Implementation | Status | Scope and Limitations |
 |---|---|---|---|
 | Four speakers | 4 × Cirrus Logic CS35L41 / AudioReach | ✅ Working | Stereo playback and volume control with per-device calibration; tuning continues |
-| Internal microphone | DMIC / Qualcomm capture path | ❌ Unsupported | No working recording integration |
+| Internal microphone | WCD938x AMIC1 over SoundWire → LPASS TX macro → ADSP codec DMA | ✅ Working | Mono 48 kHz capture through the UCM "Mic" device; validated on hardware from a RAM-booted build of this branch. The other three mics and any noise suppression are not wired yet |
 | H.264 hardware decoding | Qualcomm Iris2 / V4L2 | ✅ Working | Userspace decoding verified; not evidence of browser integration |
 | Other decoding formats | Iris / V4L2 | 🧪 Unverified | HEVC, VP9 and other formats not individually validated |
 | Browser hardware decoding | Browser / V4L2 integration | 🧪 Unverified | Video playback alone does not prove hardware decoding |

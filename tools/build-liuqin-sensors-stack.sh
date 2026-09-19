@@ -487,6 +487,7 @@ printf 'version=%s\0' "$version" >"$dest/$device_prefix/sensors/sns_reg_version"
 	"$expected_sns_reg_version_sha256" ] || die 'generated sns_reg_version mismatch'
 cp "$registry_manifest" "$dest/$device_prefix/sensors/config.SHA256SUMS"
 ln -sfn /var/lib/liuqin-sensors/registry "$dest/$device_prefix/sensors/registry"
+install -d "$dest/usr/share/doc/liuqin"
 cp "$source_manifest" "$dest/usr/share/doc/liuqin/sensor-stack-sources.manifest"
 {
 	printf '%s  %s\n' "$expected_hexagonrpc_patch_sha256" "${hexagonrpc_patch##*/}"

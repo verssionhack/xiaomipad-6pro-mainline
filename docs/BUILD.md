@@ -120,6 +120,18 @@ inside an isolated mount namespace and does not modify the input root filesystem
 The device package builder reads its binary and source identity from
 `out/gnome-control-center/`; there is no dependency on a historical Settings binary.
 
+### Prepared inputs and the artifact cache
+
+`python3 tools/prepare-image-inputs.py run` prepares every input that
+`build-liuqin-image.py` consumes and writes `out/image-inputs.local.json`.
+Cheap inputs (audio topology, firmware tree) are rebuilt fresh on every run;
+the two slow QEMU builds (the sensor stack and the GNOME Settings power panel)
+are cached under `tools/local/artifacts-cache/` keyed by a fingerprint of
+their sources: an unchanged fingerprint reuses the artifact after a sha256
+re-verification, and any change rebuilds it.  `check` only reports reuse vs
+rebuild without doing the work.  Rebuilds invoke the official builders via
+sudo (run `sudo -v` first).
+
 The speaker topology is built from the AudioReach source revision
 `2af1f1ebb8d4fd03b5f53891467ddde2e208a8a0` in
 [linux-msm/audioreach-topology](https://github.com/linux-msm/audioreach-topology).

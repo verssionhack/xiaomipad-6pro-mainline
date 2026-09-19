@@ -109,6 +109,15 @@ python3 tools/build-liuqin-settings.py --prepare-only
 不修改输入根文件系统。设备包构建器从 `out/gnome-control-center/` 读取程序与源码身份，
 不再依赖历史预编译的设置程序。
 
+### 输入准备与产物缓存
+
+`python3 tools/prepare-image-inputs.py run` 一次备齐 `build-liuqin-image.py`
+需要的全部输入并写出 `out/image-inputs.local.json`。音频拓扑、固件树等便宜的
+输入每次新鲜重建；传感器栈与 GNOME 设置程序这两个 QEMU 慢构建按来源指纹缓存
+在 `tools/local/artifacts-cache/`：输入未变时经 sha256 复验后直接复用，
+输入一变就自动重建。`check` 子命令只报告复用/重建，不动手。需要重建时
+会经 sudo 调用对应官方构建器（先 `sudo -v`）。
+
 扬声器拓扑使用
 [linux-msm/audioreach-topology](https://github.com/linux-msm/audioreach-topology)
 的 `2af1f1ebb8d4fd03b5f53891467ddde2e208a8a0` 提交。准备好对应源码后执行：

@@ -172,6 +172,18 @@ storage_resolve_target() {
 	[ -n "$storage_resolved_name" ] || return 1
 	storage_target_name=$storage_resolved_name
 	storage_target=$storage_dev_root/$storage_target_name
+	# Detect the myswap swap partition on the same UFS LUN (sda) and persist
+	# its path to /run so the storage-guard can skip it after switch_root when
+	# the mock /dev has been replaced by the real system /dev.
+	for storage_myswap in "$storage_dev_root"/sda[0-9]*; do
+		storage_path_is_block "$storage_myswap" || continue
+		storage_myswap_name=${storage_myswap##*/}
+		case "$storage_myswap_name" in sda) continue ;; esac
+		case "$storage_myswap_name" in "$storage_target_name") continue ;; esac
+		[ "$(storage_value "$storage_sys_block/$storage_myswap_name/uevent" 2>/dev/null | grep -c 'PARTLABEL=myswap' || true)" -ge 1 ] || continue
+		echo "$storage_myswap_name" > /tmp/liuqin-myswap-dev 2>/dev/null || true
+		break
+	done
 	return 0
 }
 

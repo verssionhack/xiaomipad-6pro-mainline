@@ -178,7 +178,7 @@ reset_fixture() {
 	probe=$case_root/probe
 	newroot=$case_root/newroot
 	state=$case_root/state
-	mkdir -p "$dev" "$sys/sda/queue" "$sys/sda35" "$probe/etc" \
+	mkdir -p "$dev" "$sys/sda/queue" "$sys/sda35" "$sys/sda36" "$probe/etc" \
 		"$probe/usr/local/bin" "$probe/usr/sbin" "$probe/bin" "$probe/lib" \
 		"$probe/usr/bin" "$newroot/etc" "$newroot/usr/local/bin" \
 		"$newroot/usr/sbin" "$newroot/bin" "$newroot/lib" "$newroot/usr/bin" \
@@ -554,6 +554,16 @@ make_gnome_tree() {
 
 gnome_reset_fixture() {
 	reset_fixture
+	# Add myswap partition (sda36) on the same UFS LUN as userdata
+	: >"$dev/sda36"
+	: >"$newroot/dev/sda36"
+	printf '1\n' >"$state/sda36"
+	mkdir -p "$sys/sda36"
+	printf '36\n' >"$sys/sda36/partition"
+	printf 'PARTLABEL=myswap\n' >"$sys/sda36/uevent"
+	mkdir -p "$dev/disk/by-partlabel" "$newroot/dev/disk/by-partlabel"
+	ln -sf sda36 "$dev/disk/by-partlabel/myswap"
+	ln -sf sda36 "$newroot/dev/disk/by-partlabel/myswap"
 	make_gnome_tree "$probe/gnome-root"
 	make_gnome_tree "$newroot"
 	profile_file=$case_root/liuqin-root-profile
@@ -825,6 +835,16 @@ make_native_tree() {
 
 native_reset_fixture() {
 	reset_fixture
+	# Add myswap partition (sda36) on the same UFS LUN as userdata
+	: >"$dev/sda36"
+	: >"$newroot/dev/sda36"
+	printf '1\n' >"$state/sda36"
+	mkdir -p "$sys/sda36"
+	printf '36\n' >"$sys/sda36/partition"
+	printf 'PARTLABEL=myswap\n' >"$sys/sda36/uevent"
+	mkdir -p "$dev/disk/by-partlabel" "$newroot/dev/disk/by-partlabel"
+	ln -sf sda36 "$dev/disk/by-partlabel/myswap"
+	ln -sf sda36 "$newroot/dev/disk/by-partlabel/myswap"
 	make_native_tree "$probe/native-root"
 	make_native_tree "$newroot"
 	profile_file=$case_root/liuqin-root-profile
@@ -1041,6 +1061,18 @@ gnome_reset_fixture; chmod 0644 "$probe/gnome-root/usr/local/sbin/liuqin-gnome-s
 gnome_reset_fixture; chmod 0644 "$probe/gnome-root/usr/bin/gnome-shell"; expect_rejected_before_open gnome-shell-mode
 gnome_reset_fixture; rm "$probe/gnome-root/etc/systemd/system/basic.target.requires/liuqin-gnome-storage-guard.service"; expect_rejected_before_open gnome-guard-enable-missing
 gnome_reset_fixture; rm "$probe/gnome-root/etc/systemd/system/basic.target.requires/liuqin-gnome-storage-guard.service"; ln -s ../liuqin-gnome-usb-rescue.service "$probe/gnome-root/etc/systemd/system/basic.target.requires/liuqin-gnome-storage-guard.service"; expect_rejected_before_open gnome-guard-enable-target
+# myswap swap partition on the same UFS LUN is excluded from blockdev --setro
+# The initramfs stores the myswap device path in /tmp/liuqin-myswap-dev; the
+# guard reads it and skips that partition. After switch_root the real /dev may
+# not contain sda36, but the myswap-dev file proves the guard found it.
+gnome_reset_fixture
+if ! run_init; then fail "gnome-myswap-excluded: valid GNOME root was rejected"; fi
+[ "$(cat "$state/sda")" = 0 ] || fail "gnome-myswap-excluded: parent was not opened"
+[ "$(cat "$state/sda35")" = 0 ] || fail "gnome-myswap-excluded: target was not opened"
+[ "$(cat "$state/sda1")" = 1 ] || fail "gnome-myswap-excluded: non-myswap sibling not locked"
+[ "$(cat "$state/sdb")" = 1 ] || fail "gnome-myswap-excluded: another LUN not locked"
+[ -f /tmp/liuqin-myswap-dev ] || fail "gnome-myswap-excluded: myswap-dev not recorded"
+[ "$(cat /tmp/liuqin-myswap-dev)" = "sda36" ] || fail "gnome-myswap-excluded: wrong myswap-dev value"
 gnome_reset_fixture; rm "$probe/gnome-root/etc/systemd/system/multi-user.target.wants/liuqin-gnome-usb-rescue.service"; expect_rejected_before_open gnome-rescue-enable-missing
 gnome_reset_fixture; TEST_FAIL_CHROOT=1; export TEST_FAIL_CHROOT; expect_rejected_before_open gnome-chroot-failure
 
@@ -1139,6 +1171,17 @@ native_reset_fixture; rm "$probe/native-root/etc/systemd/system/default.target";
 native_reset_fixture; rm "$probe/native-root/etc/systemd/system/display-manager.service"; ln -s /lib/systemd/system/lightdm.service "$probe/native-root/etc/systemd/system/display-manager.service"; expect_rejected_before_open native-display-manager
 native_reset_fixture; TEST_FAIL_CHROOT=1; export TEST_FAIL_CHROOT; expect_rejected_before_open native-chroot-failure
 native_reset_fixture; rm -rf "$probe/native-root"; expect_rejected_before_open native-subroot-missing
+# myswap swap partition on the same UFS LUN is excluded from blockdev --setro
+# The initramfs stores the myswap device path in /tmp/liuqin-myswap-dev; the
+# guard reads it and skips that partition.
+native_reset_fixture
+if ! run_init; then fail "native-myswap-excluded: valid native root was rejected"; fi
+[ "$(cat "$state/sda")" = 0 ] || fail "native-myswap-excluded: parent was not opened"
+[ "$(cat "$state/sda35")" = 0 ] || fail "native-myswap-excluded: target was not opened"
+[ "$(cat "$state/sda1")" = 1 ] || fail "native-myswap-excluded: non-myswap sibling not locked"
+[ "$(cat "$state/sdb")" = 1 ] || fail "native-myswap-excluded: another LUN not locked"
+[ -f /tmp/liuqin-myswap-dev ] || fail "native-myswap-excluded: myswap-dev not recorded"
+[ "$(cat /tmp/liuqin-myswap-dev)" = "sda36" ] || fail "native-myswap-excluded: wrong myswap-dev value"
 
 # The subroot is re-validated after the bind, under the native checker.
 native_reset_fixture; TEST_MUTATE_NATIVE_ON_CHROOT=1 TEST_MUTATE_NATIVE=marker-missing; export TEST_MUTATE_NATIVE_ON_CHROOT TEST_MUTATE_NATIVE; gnome_expect_rejected_safe native-rw-marker-missing

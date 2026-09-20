@@ -30,18 +30,39 @@ while IFS=' ' read -r source target fstype options _; do
 done </proc/mounts
 [ "$roots" = 1 ] || fail 'root mount is missing or duplicated'
 
+# Build a set of partition numbers to skip: /dev/sda (UFS device), root, and
+# myswap swap partition (same LUN, different partition).  Skip-set entries are
+# "sdaN" strings so the block iteration below can do a straight string match.
+skip_sda=
+skip_root=$(echo "$root_source" | sed 's|/dev/||')
+skip_myswap=
+if [ -r /tmp/liuqin-myswap-dev ]; then
+	skip_myswap=$(cat /tmp/liuqin-myswap-dev)
+elif [ -e /dev/disk/by-partlabel/myswap ]; then
+	mswap_dev=$(readlink -f /dev/disk/by-partlabel/myswap 2>/dev/null || true)
+	if [ -n "$mswap_dev" ] && echo "$mswap_dev" | grep -q '^/dev/sda[0-9]'; then
+		skip_myswap=$(echo "$mswap_dev" | sed 's|/dev/||')
+	fi
+fi >&2
+
 total=0
 for node in /dev/sd*; do
 	[ -b "$node" ] || continue
 	total=$((total + 1))
-	case $node in
-	/dev/sda|"$root_source")
-		[ "$($BB blockdev --getro "$node" 2>/dev/null)" = 0 ] || fail "$node is unexpectedly read-only"
-		;;
-	*)
-		$BB blockdev --setro "$node" 2>/dev/null || fail "cannot lock $node"
-		[ "$($BB blockdev --getro "$node" 2>/dev/null)" = 1 ] || fail "$node did not stay read-only"
-		;;
+	ndev=$(echo "$node" | sed 's|/dev/||')
+	case "$ndev" in
+		sda)
+			# UFS device itself must not be read-only
+			[ "$($BB blockdev --getro "$node" 2>/dev/null)" = 0 ] || fail "$node is unexpectedly read-only"
+			;;
+		"$skip_root"|"$skip_myswap")
+			# Root and myswap: must stay read-write
+			[ "$($BB blockdev --getro "$node" 2>/dev/null)" = 0 ] || fail "$node is unexpectedly read-only"
+			;;
+		*)
+			$BB blockdev --setro "$node" 2>/dev/null || fail "cannot lock $node"
+			[ "$($BB blockdev --getro "$node" 2>/dev/null)" = 1 ] || fail "$node did not stay read-only"
+			;;
 	esac
 done
 [ "$total" -ge 2 ] || fail 'no UFS namespace'

@@ -3,6 +3,7 @@
 # Device-side installer, intended only for the dedicated read-only RAM image.
 set -eu
 die() { printf 'liuqin-install: %s\n' "$*" >&2; exit 1; }
+progress() { printf 'liuqin-install: %s\n' "$*" >&2; }
 [ "$#" = 5 ] || [ "$#" = 6 ] || die 'usage: install-root.sh BOOT_ID ROOTFS_URL SHA256 BYTES ERASE-LIUQIN-USERDATA [ENABLE-USB-RESCUE]'
 [ "$5" = ERASE-LIUQIN-USERDATA ] || die 'explicit data-erasure acknowledgement required'
 rescue=${6:-}
@@ -38,6 +39,7 @@ for supply in /sys/class/power_supply/*; do
 done
 case $battery in ''|*[!0-9]*) die 'battery level is unavailable' ;; esac
 [ "$battery" -ge 30 ] || die 'charge the tablet to at least 30 percent before installation'
+progress "checking rootfs hash and size"
 case $3 in *[!0-9a-f]*|'') die 'invalid rootfs hash' ;; esac
 [ "${#3}" = 64 ] || die 'invalid rootfs hash length'
 case $4 in ''|*[!0-9]*) die 'invalid archive size' ;; esac
@@ -75,10 +77,14 @@ trap 'exit 130' HUP INT TERM
 mkdir -p /mnt/install-download /run/persist /mnt/install
 mount -t tmpfs -o "size=$(( $4 + 16777216 ))" tmpfs /mnt/install-download
 download_mounted=true
+progress "downloading rootfs tarball ($(printf '%s' "$4" | /bin/busybox numfmt --to=iec 2>/dev/null || echo ${4}B))"
 /bin/busybox wget -O "$archive" "$2"
+progress "download complete, verifying SHA256"
 [ "$(stat -c %s "$archive")" = "$4" ] || die 'downloaded archive size mismatch'
 printf '%s  %s\n' "$3" "$archive" | /bin/busybox sha256sum -c -
+progress "SHA256 verified"
 [ "$(cat /proc/sys/kernel/random/boot_id)" = "$1" ] || die 'RAM identity changed before formatting'
+progress "mounting persist partition for factory data check"
 [ -b /dev/disk/by-partlabel/persist ] || die 'persist is missing'
 mount -t ext4 -o ro,noload /dev/disk/by-partlabel/persist /run/persist
 persist_mounted=true
@@ -86,15 +92,19 @@ for item in wlan/wlan_mac.bin bluetooth/.bt_nv.bin audio/crus_calr.bin; do
 	[ -f "/run/persist/$item" ] || die 'factory data is incomplete'
 done
 [ -d /run/persist/sensors/registry/registry ] || die 'factory sensor registry is missing'
+progress "factory data verified, formatting userdata"
 /bin/busybox blockdev --setrw "$parent"
 opened=true
 /bin/busybox blockdev --setrw "$userdata"
 /usr/sbin/mkfs.ext4 -F -L LIUQIN_ROOT -m 0 "$userdata"
+progress "userdata formatted, mounting for extraction"
 mount -t ext4 "$userdata" /mnt/install
 mounted=true
 mkdir /mnt/install/native-root
+progress "extracting rootfs (may take a few minutes)"
 /usr/bin/tar -xzf "$archive" -C /mnt/install/native-root \
 	--numeric-owner --same-owner --same-permissions --acls --xattrs --xattrs-include='*' --warning=no-timestamp
+progress "rootfs extracted, running factory provisioning"
 PERSIST_SRC=/run/persist sh /usr/lib/liuqin/provision.sh /mnt/install/native-root
 if [ "$rescue" = ENABLE-USB-RESCUE ]; then
 	touch /mnt/install/native-root/etc/liuqin-rescue-enabled
@@ -105,12 +115,14 @@ fi
 # capability set in the stock tree instead.
 [ -n "$(/usr/sbin/getcap /mnt/install/native-root/usr/lib/aarch64-linux-gnu/gstreamer1.0/gstreamer-1.0/gst-ptp-helper 2>/dev/null)" ] ||
 	die 'xattrs not preserved in extracted rootfs'
+progress "boot contract verification"
 # Verify immutable boot-contract files after extraction and provisioning.
 tail -n +2 /etc/liuqin-native-root.contract | while read -r expected path; do
 	[ -n "$expected" ] || continue
 	actual=$(/bin/busybox sha256sum "/mnt/install/native-root$path" | /bin/busybox cut -d' ' -f1)
 	[ "$actual" = "$expected" ] || die "root contract mismatch: $path"
 done
+progress "boot contract verified"
 cleanup
 trap - EXIT HUP INT TERM
 printf 'liuqin-install: ROOT_INSTALLED\n'

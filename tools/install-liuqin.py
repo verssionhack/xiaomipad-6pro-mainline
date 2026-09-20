@@ -23,8 +23,10 @@ def sha(path):
         return hashlib.file_digest(stream, 'sha256').hexdigest()
 
 
-def command(address, text, timeout=60):
-    """Use exact line markers, not command echo, to delimit one shell result."""
+def command(address, text, timeout=60, on_progress=None):
+    """Use exact line markers, not command echo, to delimit one shell result.
+    If on_progress is given, call it with each liuqin-install: message line.
+    """
     token = 'LIUQIN_' + uuid.uuid4().hex
     start, end = token + '_START', token + '_END'
     with socket.create_connection((address, 2323), timeout=10) as connection:
@@ -38,6 +40,7 @@ def command(address, text, timeout=60):
         buffer = bytearray()
         deadline = time.monotonic() + timeout
         pattern = re.compile(rb'(?:^|\n)' + end.encode() + rb' ([0-9]+)\r?\n')
+        progress_pattern = re.compile(rb'^liuqin-install: (.+)$', re.MULTILINE)
         while time.monotonic() < deadline:
             try:
                 chunk = connection.recv(65536)
@@ -46,6 +49,12 @@ def command(address, text, timeout=60):
             if not chunk:
                 break
             buffer.extend(chunk)
+            # Extract and display progress messages from the full buffer.
+            if on_progress:
+                for m in progress_pattern.finditer(buffer):
+                    msg = m.group(1).decode(errors='replace').strip()
+                    if msg:
+                        on_progress(msg)
             # Backup output can be large; the terminator is always at the tail.
             match = pattern.search(buffer, max(0, len(buffer) - 512))
             if match:
@@ -146,9 +155,9 @@ def main():
                 if time.monotonic() >= deadline:
                     raise RuntimeError('Installer USB channel did not become ready; no formatting performed')
                 time.sleep(2)
-        def remote(text, timeout=60):
+        def remote(text, timeout=60, on_progress=None):
             guard = 'test "$(cat /proc/sys/kernel/random/boot_id)" = ' + shlex.quote(boot_id)
-            return command(args.device_address, guard + ' && ' + text, timeout)
+            return command(args.device_address, guard + ' && ' + text, timeout, on_progress)
 
         cmdline = shlex.split(remote('cat /proc/cmdline').decode())
         serial = next((item.split('=', 1)[1] for item in cmdline if item.startswith('androidboot.serialno=')), '')
@@ -187,7 +196,13 @@ def main():
         if args.enable_rescue:
             install.append('ENABLE-USB-RESCUE')
         print('Installing Kali Linux; userdata will be erased after input checks.', flush=True)
-        result = remote(shlex.join(install), 3600)
+        _last_progress = ''
+        def _show_progress(msg):
+            nonlocal _last_progress
+            if msg != _last_progress:
+                print('  >>> ' + msg, flush=True)
+                _last_progress = msg
+        result = remote(shlex.join(install), 3600, on_progress=_show_progress)
         if b'liuqin-install: ROOT_INSTALLED' not in result:
             raise RuntimeError('Device did not confirm root installation')
         remote("(sleep 2; /usr/sbin/liuqin-reboot bootloader) >/dev/null 2>&1 &")

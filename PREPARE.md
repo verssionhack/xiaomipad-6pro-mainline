@@ -25,7 +25,7 @@ build (see `docs/BUILD.md`); they are not "prepared" inputs.
 | `tools/local/kali-rootfs-arm64/rootfs` | Kali Rolling arm64 base rootfs (desktop + Kali toolset), pinned by `rootfs.manifest` | `tools/build-liuqin-kali-base.sh` then `tools/build-liuqin-kali-rootfs.sh manifest` | Kali apt (default mirror `mirrors.aliyun.com/kali`) |
 | `tools/local/aosp-mkbootimg/` | AOSP `mkbootimg.py` + `unpack_bootimg.py` (commit `954bc3ea`) | `tools/fetch-aosp-mkbootimg.sh` | `android.googlesource.com` (or a local AOSP tree) |
 | `tools/local/busybox-arm64/usr/bin/busybox` | static AArch64 busybox, sha256 `52151e7f322f…` | `tools/fetch-busybox-arm64.sh` | Kali `busybox-static_1.36.1-11_arm64.deb` (or a local copy) |
-| `tools/local/roms/liuqin/OS2.0.203.0.VMYCNXM/` | curated ROM extract: 14 DTBs, 44 DTBOs, 59 sensor config, factory registry (119 files) | `tools/prepare-rom.sh` | a stock fastboot ROM + the vendor/persist partition images |
+| `tools/local/roms/liuqin/OS2.0.6.0.VMYCNXM/` | curated ROM extract: 14 DTBs, 44 DTBOs, sensor config + factory registry (119 files) | `tools/prepare-rom.sh` | a stock fastboot ROM + the vendor/persist partition images |
 | `tools/local/firmware-liuqin/` | 186-file firmware pool for `build-liuqin-firmware-prep.sh` | `tools/prepare-firmware-pool.sh` | tracked `device/firmware/` |
 | `tools/local/installer-runtime/` | installer userspace: `tar`, `install`, `mkfs.ext4`, `e2fsck`, `getcap`, `liuqin-reboot` + their libs | `tools/lib/build-installer-runtime.py` | Kali rootfs + tracked `device/charger-mode/liuqin-charger-mode-exit.c` |
 | `tools/local/sensor-stack-src/`, `tools/local/apt-cache-kali-rolling-arm64/` | sensor-stack git sources + apt cache | `tools/build-liuqin-sensors-stack.sh` | `git` (per `device/sensors/sources.manifest`) + Kali apt |
@@ -83,7 +83,7 @@ skipped when its marker (`base.installed`) is present.
 
 ### 4. Stock-ROM extract (DTB / DTBO / sensor config / registry)
 ```sh
-sudo tools/prepare-rom.sh <ROM_DIR> <VENDOR_IMG> tools/local/roms/liuqin/OS2.0.203.0.VMYCNXM
+sudo tools/prepare-rom.sh <ROM_DIR> <VENDOR_IMG> tools/local/roms/liuqin/OS2.0.6.0.VMYCNXM
 ```
 - `<ROM_DIR>`: a directory containing `images/dtbo.img`,
   `images/vendor_boot.img` and `images/persist.img` (a stock fastboot ROM).
@@ -151,7 +151,7 @@ kernel (`tools/build-liuqin-kernel.py`) → kernel-modules + debs
 ```sh
 # counts
 [ "$(find tools/local/firmware-liuqin -type f | wc -l)" = 186 ]
-[ "$(find tools/local/roms/liuqin/OS2.0.203.0.VMYCNXM -type f | wc -l)" = 119 ]
+[ "$(find tools/local/roms/liuqin/OS2.0.6.0.VMYCNXM -type f | wc -l)" = 119 ]
 [ -x tools/local/kali-rootfs-arm64/rootfs/usr/lib/systemd/systemd ]
 # pinned hashes
 sha256sum tools/local/busybox-arm64/usr/bin/busybox        # 52151e7f322f…

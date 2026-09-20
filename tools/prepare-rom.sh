@@ -22,7 +22,7 @@ project_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 
 die() { printf 'prepare-rom: %s\n' "$*" >&2; exit 1; }
 [ "$#" = 3 ] ||
-	die 'usage: prepare-rom.sh ROM_DIR VENDOR_IMG OUT_DIR   (OUT_DIR = tools/local/roms/liuqin/OS2.0.203.0.VMYCNXM)'
+	die 'usage: prepare-rom.sh ROM_DIR VENDOR_IMG OUT_DIR   (OUT_DIR = tools/local/roms/liuqin/OS2.0.6.0.VMYCNXM)'
 rom_dir=$1
 vendor_img=$2
 out_dir=$3

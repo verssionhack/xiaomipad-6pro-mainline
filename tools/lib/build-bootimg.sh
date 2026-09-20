@@ -67,7 +67,7 @@ gzip -n -9 -c "$image" >"$image_gz"
 # property the DT-selection path reads is mirrored byte-for-byte from the
 # accepted DTB, so private checks see exactly what they demonstrably accepted.
 if [ "${ABL_DTB02_IDS:-0}" = 1 ]; then
-	stock_soc_dtb=${STOCK_SOC_DTB:-"$project_root/tools/local/roms/liuqin/OS2.0.203.0.VMYCNXM/analysis/vendor_boot/dtbs/dtb-02.dtb"}
+	stock_soc_dtb=${STOCK_SOC_DTB:-"$project_root/tools/local/roms/liuqin/OS2.0.6.0.VMYCNXM/analysis/vendor_boot/dtbs/dtb-02.dtb"}
 	stock_soc_dtb_sha256=5c1aa50c509837d26ffa674c5f6e70111a640c2e30e5912f06cb7cd66cfd7996
 	if ! printf '%s  %s\n' "$stock_soc_dtb_sha256" "$stock_soc_dtb" | sha256sum -c --quiet -; then
 		echo "error: stock dtb-02.dtb does not match the pinned hash" >&2
@@ -102,8 +102,8 @@ fi
 # first label it names. So seed the union from every stock base DTB as well:
 # any overlay ABL applies was authored against one of those.
 if [ "${ABL_OVERLAY_SINK:-1}" = 1 ]; then
-	stock_overlay_dir=${STOCK_OVERLAY_DIR:-"$project_root/tools/local/roms/liuqin/OS2.0.203.0.VMYCNXM/analysis/dtbo"}
-	stock_base_dir=${STOCK_BASE_DIR:-"$project_root/tools/local/roms/liuqin/OS2.0.203.0.VMYCNXM/analysis/vendor_boot/dtbs"}
+	stock_overlay_dir=${STOCK_OVERLAY_DIR:-"$project_root/tools/local/roms/liuqin/OS2.0.6.0.VMYCNXM/analysis/dtbo"}
+	stock_base_dir=${STOCK_BASE_DIR:-"$project_root/tools/local/roms/liuqin/OS2.0.6.0.VMYCNXM/analysis/vendor_boot/dtbs"}
 	stock_overlay_count=$(find "$stock_overlay_dir" -maxdepth 1 -type f \
 		-regex '.*/entry\.[0-9]+' 2>/dev/null | wc -l)
 	if [ "$stock_overlay_count" -ne 44 ]; then

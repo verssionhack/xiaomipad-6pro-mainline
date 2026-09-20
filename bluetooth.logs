@@ -1,0 +1,11 @@
+Sep 20 14:28:31 liuqin bluetoothd[7062]: src/service.c:btd_service_connect() a2dp-source profile connect failed for A8:E6:E8:D8:35:B9: Device or resource busy
+Sep 20 14:28:31 liuqin bluetoothd[7062]: profiles/audio/avctp.c:avctp_control_confirm() Control: Refusing unexpected connect
+Sep 20 14:28:48 liuqin bluetoothd[7062]: profiles/audio/avdtp.c:cancel_request() Start: Connection timed out (110)
+Sep 20 14:28:50 liuqin bluetoothd[7062]: profiles/audio/avdtp.c:cancel_request() Abort: Connection timed out (110)
+Sep 20 14:28:54 liuqin bluetoothd[7062]: src/profile.c:ext_io_disconnected() Unable to get io data for Hands-Free Voice gateway: getpeername: Transport endpoint is not connected (107)
+Sep 20 14:29:00 liuqin bluetoothd[7062]: src/profile.c:record_cb() Unable to get Hands-Free Voice gateway SDP record: Host is down
+Sep 20 14:29:07 liuqin bluetoothd[7062]: src/profile.c:record_cb() Unable to get Hands-Free Voice gateway SDP record: Host is down
+Sep 20 14:29:30 liuqin bluetoothd[7062]: src/profile.c:record_cb() Unable to get Hands-Free Voice gateway SDP record: Connection timed out
+Sep 20 14:29:32 liuqin bluetoothd[7062]: plugins/policy.c:reconnect_timeout() Reconnecting services failed: Device or resource busy (16)
+Sep 20 14:29:33 liuqin bluetoothd[7062]: profiles/audio/avdtp.c:avdtp_connect_cb() connect to A8:E6:E8:D8:35:B9: Connection refused (111)
+~

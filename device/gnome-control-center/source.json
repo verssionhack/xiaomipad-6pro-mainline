@@ -1,10 +1,10 @@
 {
   "package": "gnome-control-center",
-  "version": "1:47.90-1",
+  "version": "1:50.3-1",
   "base_url": "https://archive.kali.org/kali/pool/main/g/gnome-control-center/",
   "archives": {
-    "gnome-control-center_47.90.orig.tar.xz": "PLACEHOLDER_SHA256",
-    "gnome-control-center_47.90-1.debian.tar.xz": "PLACEHOLDER_SHA256"
+    "gnome-control-center_50.3.orig.tar.xz": "06eebb0fd3056c4d8d78bbd3754c96108f381d70b760da423c5024946944287c",
+    "gnome-control-center_50.3-1.debian.tar.xz": "4f7cc388a0b8445884662807fbfff00a4b3cecd4d936927c7679c61382e3757d"
   },
   "patch": "device/gnome-control-center/patches/0001-expose-liuqin-power-button-policy.patch",
   "patch_sha256": "33f941331158904e5842f704166301d1fe25c47330bf669af466f2d8bfc99077"

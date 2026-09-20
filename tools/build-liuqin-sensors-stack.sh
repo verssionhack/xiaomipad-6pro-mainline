@@ -306,13 +306,15 @@ ldconfig
 
 build_one iio-sensor-proxy -Dssc-support=enabled -Dtests=true -Dgtk-tests=false -Dgtk_doc=false \
 	-Dudevrulesdir=/usr/lib/udev/rules.d -Dsystemdsystemunitdir=/usr/lib/systemd/system
-# All four SSC cases register QRTR service 400.  Run the other 21 tests in
+# All four SSC cases register QRTR service 400.  Run the other 22 tests in
 # parallel, then the SSC cases serially: full coverage without the false race
-# where one mock removes another's service.
+# where one mock removes another's service.  (22 = 19 integration +
+# test-mount-matrix + test-orientation + the polkit_policy xmllint check, the
+# latter present because the Kali base ships libxml2-utils.)
 test_list=$(meson test -C /build/work/iio-sensor-proxy --list)
 non_ssc_tests=$(printf '%s\n' "$test_list" | grep -v 'Tests.test_ssc_')
 ssc_tests=$(printf '%s\n' "$test_list" | grep 'Tests.test_ssc_')
-[ "$(printf '%s\n' "$non_ssc_tests" | grep -c .)" = 21 ] || {
+[ "$(printf '%s\n' "$non_ssc_tests" | grep -c .)" = 22 ] || {
 	printf '%s\n' 'unexpected non-SSC iio test count' >&2
 	exit 1
 }
@@ -328,8 +330,8 @@ ssc_accel_test=$(printf '%s\n' "$ssc_tests" | grep 'Tests.test_ssc_accel$')
 # Test names contain no whitespace in upstream 3.9, so deliberate word
 # splitting passes one name per argument.
 non_ssc_log=/build/work/iio-sensor-proxy/meson-logs/testlog-non-ssc.txt
-if testlog_passed "$non_ssc_log" 21; then
-	printf '%s\n' 'iio-sensor-proxy: retaining current 21/21 non-SSC PASS testlog'
+if testlog_passed "$non_ssc_log" 22; then
+	printf '%s\n' 'iio-sensor-proxy: retaining current 22/22 non-SSC PASS testlog'
 else
 	# shellcheck disable=SC2086
 	meson test -C /build/work/iio-sensor-proxy --num-processes "$jobs" \

@@ -104,6 +104,7 @@ def build(rootfs, source, out, lock, jobs):
         (root / 'etc/apt/sources.list.d/cdrom.sources').unlink(missing_ok=True)
         # APT hooks are lists; assigning a scalar does not remove inherited entries.
         (root / 'etc/apt/apt.conf.d/zz-liuqin-build').write_text(
+            'Acquire::ForceIPv4 "true";\n'
             '#clear APT::Update::Post-Invoke;\n#clear APT::Update::Post-Invoke-Success;\n')
         initramfs_config = root / 'etc/initramfs-tools/update-initramfs.conf'
         initramfs_config.parent.mkdir(parents=True, exist_ok=True)

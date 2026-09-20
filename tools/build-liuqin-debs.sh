@@ -27,40 +27,29 @@ version=${LIUQIN_DEB_VERSION:-0.1}
 maintainer='yzddmr6 <46088090+yzddmr6@users.noreply.github.com>'
 
 firmware_tree=${FIRMWARE_TREE:-"$project_root/device/firmware"}
-firmware_manifest_sha256=${FIRMWARE_MANIFEST_SHA256:-012c413e0a5d5c3c14631fbdfe50da5c51e95ffc1ae431b8d93f776538b65ba2}
+firmware_manifest_sha256=${FIRMWARE_MANIFEST_SHA256:-d21239b84bb39e27a183161e58c813537c30b2654e1753a6e3beb0119f6847eb}
 overlay=${GNOME_OVERLAY:-"$project_root/device/gnome-overlay"}
 kali_rootfs=${KALI_ROOT_ROOTFS:-"$project_root/tools/local/kali-rootfs-arm64/rootfs"}
 audio_probe_libasound=$kali_rootfs/usr/lib/aarch64-linux-gnu/libasound.so.2.0.0
 busybox=${BUSYBOX:-"$project_root/tools/local/busybox-arm64/usr/bin/busybox"}
-busybox_sha256=${BUSYBOX_SHA256:-52151e7f322f926b64049cdaa1410dc3ea6485525e0624b05813791c219ae933}
+busybox_sha256=${BUSYBOX_SHA256:-f10ec6f1c3b41b6015cc0f15c11a4ce4e06fff158e20bdbe9a527a3ed3ea752a}
 power_key_cc=${POWER_KEY_CC:-$(command -v aarch64-linux-gnu-gcc || true)}
 power_keyd_source=${POWER_KEYD_SOURCE:-"$project_root/device/power-key/liuqin-power-keyd.c"}
 uinput_automation_source=${UINPUT_AUTOMATION_SOURCE:-"$project_root/device/input/liuqin-uinput-automation.c"}
 audio_probe_source=${AUDIO_PROBE_SOURCE:-"$project_root/device/audio-topology/liuqin-audio-hwparams-probe.c"}
-# The reviewed Settings build ships in the source tree (prebuilt); a rebuild
-# from tools/build-liuqin-settings.py can be substituted via the overrides.
-power_settings_binary=${POWER_SETTINGS_BINARY:-"$project_root/device/gnome-control-center/prebuilt/gnome-control-center"}
-power_settings_sha256=${POWER_SETTINGS_SHA256:-14b4147249130ef069a33d04cae4b810e46afdca6871abdfc6c521870c42d213}
+# The power panel is a patch to the native Kali gnome-control-center shell,
+# rebuilt from the Kali source package (tools/build-liuqin-settings.py). The
+# fresh build is picked up from its build-info manifest; the binary SHA is
+# derived from that manifest unless POWER_SETTINGS_SHA256 pins it explicitly.
+power_settings_binary=${POWER_SETTINGS_BINARY:-"$project_root/out/gnome-control-center/gnome-control-center"}
+power_settings_sha256=${POWER_SETTINGS_SHA256:-}
 power_settings_manifest=${POWER_SETTINGS_MANIFEST:-"$project_root/out/gnome-control-center/build-info.json"}
-# The reviewed build links the Ubuntu whoopsie preference pair and the
-# ubuntu-pro insights client library; carry that closure so it resolves on
-# the Kali root.
-whoopsie_dir=$project_root/device/gnome-control-center/prebuilt
-whoopsie_core_sha256=16b5eba0098cbd7b2422d4d4a21c033a22578ec3b1d3645b081056984b40e673
-whoopsie_prefs_sha256=f35412c537b08f74785ec441cc30959afcb9cbb828374e93592130f38c30487c
-insights_sha256=e22c37fd55d95dedbfe69ce9c70c1816802f2bb4dd3029d088bca4abca64a7f2
-# The reviewed build links malcontent 0.14 symbols that the Kali 0.13 build
-# lacks; the newer library is a symbol superset, so it serves both consumers.
-malcontent_sha256=cbd014d9692870b2257096ffd5eb2d04e4d91132809b8d024c0d2ad2d3e8f02f
-# The reviewed shell model references the "ubuntu" panel; without the
-# desktop entry the model build asserts and the app bails out.
-ubuntu_panel_sha256=f6fa806c48559e7f78a1496197b00cd7e19117ec682be350b5c4d23533d2d4b4
 # Pinned compiled schema database (reviewed bytes; glib-compile-schemas output
 # is not byte-stable across host glib versions).
 power_schemas_sha256=8a2e5d1f1bcef353b9d3af47aa77bb75848fd31bd8cdfa49a3d1e83d4521357b
 # SENSOR_STACK_SHA256 selects the sensor build to include in this package set.
 sensor_stack=${SENSOR_STACK_TAR:-"$project_root/out/liuqin-sensors-stack/artifacts/sensor-stack.tar"}
-sensor_stack_sha256=${SENSOR_STACK_SHA256:-9dcb2b8cb3a6539ccd6d2b410476f3e6ebc725072a3b63089a570ebdaeec5701}
+sensor_stack_sha256=${SENSOR_STACK_SHA256:-94e66ca05d589cbcd20fb583485019fe020245cb7adce164dc2d7a3315eb2114}
 webkit_env=etc/environment.d/50-liuqin-dmabuf.conf
 webkit_env_sha256=1db6b589d305556a976c72b20500d9e932650eb090ba845052a0b8f659bdcca5
 
@@ -109,14 +98,18 @@ write_divert_postrm() {
 	} >"$work/$pkg.postrm"
 }
 
-pack() { # pack <pkg> <arch> <depends> <description> [extra DEBIAN files...]
-	pkg=$1; arch=$2; depends=$3; desc=$4
+pack() { # pack <pkg> <arch> <depends> <description> [replaces]
+	pkg=$1; arch=$2; depends=$3; desc=$4; replaces=${5-}
 	root=$work/$pkg/root
 	[ -d "$root/DEBIAN" ] || mkdir -p "$root/DEBIAN"
 	{
 		printf 'Package: %s\nVersion: %s\nArchitecture: %s\n' "$pkg" "$version" "$arch"
 		printf 'Maintainer: %s\n' "$maintainer"
 		[ -z "$depends" ] || printf 'Depends: %s\n' "$depends"
+		# Replaces (not Conflicts): the ROM build overwrites a file the distro
+		# still owns, but the distro package must remain installed because the
+		# stock iio-sensor-proxy we depend on still needs it.
+		[ -z "$replaces" ] || printf 'Replaces: %s\n' "$replaces"
 		printf 'Section: misc\nPriority: optional\n'
 		printf 'Description: %s\n' "$desc"
 	} >"$root/DEBIAN/control"
@@ -277,11 +270,10 @@ PY
 		die 'power-key daemon is not an AArch64 executable'
 	install -D -m 0755 "$busybox" "$root/usr/local/bin/busybox"
 	if [ -f "$overlay/usr/share/liuqin/power/io.github.liuqin.power.gschema.xml" ]; then
+		# The power panel is a patch to the native Kali gnome-control-center
+		# shell (rebuilt from Kali source), so it carries no Ubuntu whoopsie,
+		# insights or ubuntu-panel closure to install alongside it.
 		install -D -m 0755 "$power_settings_binary" "$root/usr/bin/gnome-control-center"
-		sha_ok "$whoopsie_dir/gnome-ubuntu-panel.desktop" "$ubuntu_panel_sha256" \
-			'ubuntu panel desktop entry identity mismatch'
-		install -D -m 0644 "$whoopsie_dir/gnome-ubuntu-panel.desktop" \
-			"$root/usr/share/applications/gnome-ubuntu-panel.desktop"
 		if [ -f "$root/usr/share/liuqin/power/gschemas.compiled" ]; then
 			# The overlay ships the reviewed compiled database; keep its exact
 			# bytes instead of regenerating with the host glib.
@@ -292,25 +284,6 @@ PY
 			glib-compile-schemas --strict "$root/usr/share/liuqin/power"
 			chmod 0644 "$root/usr/share/liuqin/power/gschemas.compiled"
 		fi
-		sha_ok "$whoopsie_dir/libwhoopsie.so.0.0" "$whoopsie_core_sha256" \
-			'whoopsie closure identity mismatch'
-		sha_ok "$whoopsie_dir/libwhoopsie-preferences.so.0.0.0" \
-			"$whoopsie_prefs_sha256" 'whoopsie closure identity mismatch'
-		sha_ok "$whoopsie_dir/libinsights.so.0" "$insights_sha256" \
-			'insights closure identity mismatch'
-		install -D -m 0644 "$whoopsie_dir/libwhoopsie.so.0.0" \
-			"$root/usr/lib/aarch64-linux-gnu/libwhoopsie.so.0.0"
-		ln -sfn libwhoopsie.so.0.0 "$root/usr/lib/aarch64-linux-gnu/libwhoopsie.so.0"
-		install -D -m 0644 "$whoopsie_dir/libwhoopsie-preferences.so.0.0.0" \
-			"$root/usr/lib/aarch64-linux-gnu/libwhoopsie-preferences.so.0.0.0"
-		ln -sfn libwhoopsie-preferences.so.0.0.0 \
-			"$root/usr/lib/aarch64-linux-gnu/libwhoopsie-preferences.so.0"
-		install -D -m 0644 "$whoopsie_dir/libinsights.so.0" \
-			"$root/usr/lib/aarch64-linux-gnu/libinsights.so.0"
-		sha_ok "$whoopsie_dir/libmalcontent-0.so.0.14.0" "$malcontent_sha256" \
-			'malcontent closure identity mismatch'
-		install -D -m 0644 "$whoopsie_dir/libmalcontent-0.so.0.14.0" \
-			"$root/usr/lib/aarch64-linux-gnu/libmalcontent-0.so.0.14.0"
 	fi
 	mkdir -p "$root/DEBIAN"
 	write_divert_preinst "$pkg" /usr/bin/gnome-control-center
@@ -377,7 +350,8 @@ build_sensors() {
 	cp "$work/$pkg.preinst" "$root/DEBIAN/preinst"
 	cp "$work/$pkg.postrm" "$root/DEBIAN/postrm"
 	pack "$pkg" arm64 'libqrtr1, libprotobuf-c1, iio-sensor-proxy' \
-		'Xiaomi Pad 6 Pro (liuqin) SSC sensor stack (hexagonrpcd, libssc, SSC iio-sensor-proxy)'
+		'Xiaomi Pad 6 Pro (liuqin) SSC sensor stack (hexagonrpcd, libssc, SSC iio-sensor-proxy)' \
+		'libssc2'
 }
 
 build_kernel() {

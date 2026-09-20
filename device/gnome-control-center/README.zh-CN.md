@@ -1,6 +1,6 @@
 # GNOME 设置适配
 
-本组件基于 Ubuntu 的 `gnome-control-center 1:50.0-0ubuntu6`，保留发行版补丁和各设置面板，
+本组件基于 Kali 的 `gnome-control-center 1:50.3-1`，保留发行版补丁和各设置面板，
 增加平板电源键策略的原生设置入口。
 
 源码归档和项目补丁的校验值记录在 [source.json](source.json)。从主项目根目录准备源码：
@@ -9,7 +9,7 @@
 python3 tools/build-liuqin-settings.py --prepare-only
 ```
 
-在配置好 AArch64 binfmt 的 Linux 主机上，使用已准备的 Ubuntu ARM64 根文件系统构建：
+在配置好 AArch64 binfmt 的 Linux 主机上，使用已准备的 Kali ARM64 根文件系统构建：
 
 ```sh
 sudo python3 tools/build-liuqin-settings.py --jobs 8

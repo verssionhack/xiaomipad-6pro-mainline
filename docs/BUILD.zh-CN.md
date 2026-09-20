@@ -55,7 +55,7 @@ python3 tools/build-liuqin-kernel.py --jobs 12
 
 | 内容 | 获取与维护方式 |
 |---|---|
-| Kali Linux rootfs 基础系统 | 脚本下载固定的 Kali Linux arm64 rootfs tarball、校验后解压；本仓库不镜像原版 tarball |
+| Kali Linux rootfs 基础系统 | debootstrap 固定 Kali Linux Rolling arm64 基础并在 chroot 中安装 GNOME 桌面 + Kali 工具集；结果树用路径/模式/属主/sha256 清单固定 |
 | 未修改的 Kali Linux 软件包、BusyBox | 从 Kali Linux 软件源下载，复用本地缓存；不另建软件包镜像站 |
 | 上游工具与用户态源码 | 使用固定上游版本；本仓库保留调用代码、必要补丁和版本引用 |
 | 设备内核与项目适配 | 本项目两仓维护源码；安装版本提供匹配的预编译组件 |
@@ -69,16 +69,21 @@ python3 tools/build-liuqin-kernel.py --jobs 12
 
 ### Kali Linux Rootfs
 
-需要 curl、util-linux（flock）和 tar。按顺序执行：
+安装 debootstrap 与 qemu-user-static（binfmt 需 P 标志），然后按顺序执行：
 
 ```sh
-sh tools/build-liuqin-kali-rootfs.sh download
-sudo sh tools/build-liuqin-kali-rootfs.sh extract
+sudo tools/build-liuqin-kali-base.sh all
+sudo tools/build-liuqin-kali-rootfs.sh manifest
 ```
 
-下载复用已校验缓存，传输中断可续传；`KALI_ROOTFS_URL` 可指定提供同一文件的镜像，
-不会接受不同版本。输入位置可用 `KALI_ROOT_INPUT` 指定，后续步骤须使用相同值。
-提取只准备桌面基础系统；还需装入项目设备组件，不能直接作为平板启动镜像。
+`build-liuqin-kali-base.sh` 先 debootstrap 最小 arm64 基础（默认镜像
+`http://mirrors.aliyun.com/kali`，可用 `KALI_MIRROR` 覆盖），再在 chroot 中安装
+GNOME 桌面、Kali 默认工具集与平板默认软件包。每个阶段都是幂等的：标记存在时跳过。
+`build-liuqin-kali-rootfs.sh manifest` 把结果树逐文件指纹化（路径、模式、属主、
+sha256）写入 `tools/local/kali-rootfs-arm64/rootfs.manifest`；清单阶段要求真实 root，
+且若树内仍挂载了宿主文件系统会直接失败。`build-liuqin-native-root.sh` 固定该清单的
+sha256，树发生漂移即拒绝。输入位置可用 `KALI_ROOT_INPUT` 指定，后续步骤须使用相同值。
+基础系统只准备根文件系统；还需装入项目设备组件，不能直接作为平板启动镜像。
 
 ### 设备组件
 

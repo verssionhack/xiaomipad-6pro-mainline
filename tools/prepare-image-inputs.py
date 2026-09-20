@@ -61,8 +61,8 @@ def dir_content_hash(path: Path) -> str:
 # --- fingerprints -----------------------------------------------------------
 
 def sensors_fingerprint() -> dict:
-    rom = (PROJECT / 'tools/local/roms/liuqin/OS2.0.6.0.VMYCNXM/extracted/'
-           'super-work/vendor-extract/etc/sensors')
+    rom = (PROJECT / 'tools/local/roms/liuqin/OS2.0.203.0.VMYCNXM/extracted/'
+           'super-work/vendor-extract/sensors')
     return {
         'device/sensors': tree_hash('device/sensors'),
         'device/sensors-overlay': tree_hash('device/sensors-overlay'),
@@ -228,15 +228,15 @@ def cmd_run() -> None:
     # Paths are absolute: build-liuqin-image.py resolves relative values
     # against the JSON file's own directory, not against the project.
     inputs = {
-        'UBUNTU_DESKTOP_ROOT': str(PROJECT / 'tools/local/ubuntu-desktop-26.04-arm64/rootfs'),
-        'DESKTOP_ROOTFS_MANIFEST': str(PROJECT / 'tools/local/ubuntu-desktop-26.04-arm64/rootfs.manifest'),
+        'KALI_ROOT_ROOTFS': str(PROJECT / 'tools/local/kali-rootfs-arm64/rootfs'),
+        'KALI_ROOTFS_MANIFEST': str(PROJECT / 'tools/local/kali-rootfs-arm64/rootfs.manifest'),
         'FIRMWARE_POOL': str(PROJECT / 'tools/local/firmware-liuqin'),
         'FIRMWARE_TREE': str(firmware_dir),
         'FIRMWARE_MANIFEST_SHA256': sha256_file(firmware_manifest),
         'AUDIO_TOPOLOGY': str(topology_bin),
         'WLAN_HSP2_TUPLE': str(PROJECT / 'out/wlan-source-check'),
-        'STOCK_OVERLAY_DIR': str(PROJECT / 'tools/local/roms/liuqin/OS2.0.6.0.VMYCNXM/analysis/dtbo'),
-        'STOCK_BASE_DIR': str(PROJECT / 'tools/local/roms/liuqin/OS2.0.6.0.VMYCNXM/analysis/vendor_boot/dtbs'),
+        'STOCK_OVERLAY_DIR': str(PROJECT / 'tools/local/roms/liuqin/OS2.0.203.0.VMYCNXM/analysis/dtbo'),
+        'STOCK_BASE_DIR': str(PROJECT / 'tools/local/roms/liuqin/OS2.0.203.0.VMYCNXM/analysis/vendor_boot/dtbs'),
         'SENSOR_STACK_TAR': str(sensor_tar),
         'SENSOR_STACK_SHA256': sha256_file(sensor_tar),
         'POWER_SETTINGS_BINARY': str(settings_bin),

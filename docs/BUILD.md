@@ -58,7 +58,7 @@ complete toolchain and build inputs.
 
 | Component | Delivery |
 |---|---|
-| Kali Linux rootfs base | Download the pinned Kali Linux arm64 rootfs tarball and extract it; this repository does not mirror the tarball |
+| Kali Linux rootfs base | Debootstrap the Kali Linux Rolling arm64 base and install the GNOME desktop + Kali toolset in a chroot; the resulting tree is pinned by a path/mode/owner/sha256 manifest |
 | Unmodified Kali Linux packages and BusyBox | Download from Kali Linux repositories and cache locally; no duplicate package mirror |
 | Upstream tools and userspace source | Pin upstream versions; maintain integration code and necessary patches here |
 | Device kernel and project integration | Maintain source in the two project repositories; provide matching binaries with installation releases |
@@ -73,17 +73,24 @@ and observe each release's tested scope and limitations.
 
 ### Kali Linux Rootfs
 
-Install curl, util-linux (flock) and tar, then run:
+Install debootstrap and qemu-user-static (binfmt with the P flag), then run:
 
 ```sh
-sh tools/build-liuqin-kali-rootfs.sh download
-sudo sh tools/build-liuqin-kali-rootfs.sh extract
+sudo tools/build-liuqin-kali-base.sh all
+sudo tools/build-liuqin-kali-rootfs.sh manifest
 ```
 
-Verified cached downloads are reused and interrupted transfers can resume.
-`KALI_ROOTFS_URL` may select a mirror supplying identical pinned bytes, not a
-different release. Set `KALI_ROOT_INPUT` consistently across stages to change
-the input directory. Extraction prepares the rootfs base only; project device
+`build-liuqin-kali-base.sh` debootstraps the minimal arm64 base (default mirror
+`http://mirrors.aliyun.com/kali`, override with `KALI_MIRROR`) and installs the
+GNOME desktop, the Kali default toolset and the tablet's default packages in a
+chroot. Each stage is idempotent: it is skipped when its marker is present.
+`build-liuqin-kali-rootfs.sh manifest` then fingerprints the resulting tree
+(path, mode, owner, sha256 per file) into
+`tools/local/kali-rootfs-arm64/rootfs.manifest`; the manifest pass requires
+real root and fails if any host filesystem is still mounted into the tree.
+`build-liuqin-native-root.sh` pins that manifest's sha256 and refuses a tree
+that drifted. Set `KALI_ROOT_INPUT` consistently across stages to change the
+input directory. The base prepares the root filesystem only; project device
 components must still be installed before it can boot on the tablet.
 
 ### Device Components
@@ -185,8 +192,8 @@ or Android recovery.
 ## Continuous Integration
 
 The workflow builds the pinned kernel using the same Python entry point as the
-local build. Its artifacts are kernel build outputs, not installable Ubuntu
-releases. Kernel-repository development builds share the same action.
+local build. Its artifacts are kernel build outputs, not installable Kali
+Linux releases. Kernel-repository development builds share the same action.
 `tools/build-liuqin-image.py` assembles matching system artifacts with resumable
 stages. The image workflow requires a configured dedicated runner; see
 [CI setup](CI.md). Follow the [installation steps](INSTALL-TESTING.md) for device

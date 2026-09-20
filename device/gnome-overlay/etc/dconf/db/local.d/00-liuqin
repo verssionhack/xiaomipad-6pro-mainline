@@ -1,10 +1,20 @@
 [org/gnome/desktop/interface]
-# 1800x2880 on a 11" panel. At 1x everything is unreadable.
+# The default UI scale is 150%, set by the system monitor configuration
+# /etc/xdg/monitors.xml (a per-monitor fractional scale; the integer-only
+# scaling-factor key below cannot express 1.5).  This key is only the fallback
+# for Mutter's *automatic* scale path (used if the saved monitor config does
+# not match the connected panel); 2 is the nearest usable integer to 150% on
+# this 1800x2880 11" panel, where 1x would be unreadable.
 scaling-factor=uint32 2
+# Show the battery percentage in the top bar. Upstream defaults this to
+# false; on a tablet the charge level is a glanceable state, not a detail
+# that needs the quick settings panel.
+show-battery-percentage=true
 
 [org/gnome/desktop/a11y/applications]
-# There is no keyboard attached and no guarantee one ever will be.
-screen-keyboard-enabled=true
+# No on-screen keyboard by default (user preference); a physical magnetic
+# keyboard is the normal input, so it is only enabled per-session if needed.
+screen-keyboard-enabled=false
 
 [org/gnome/desktop/session]
 # Five minutes. This was 0 -- never blank -- while the display was still being

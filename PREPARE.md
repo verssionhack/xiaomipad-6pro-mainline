@@ -22,7 +22,7 @@ build (see `docs/BUILD.md`); they are not "prepared" inputs.
 
 | Path | What it is | Reprepared by | Bytes come from |
 |------|-----------|---------------|-----------------|
-| `tools/local/kali-rootfs-arm64/rootfs` | Kali Rolling arm64 base rootfs (v2026.3), pinned by `rootfs.manifest` (86 641 entries) | `tools/build-liuqin-kali-rootfs.sh extract` | `kali.download` rootfs tarball (or a local copy) |
+| `tools/local/kali-rootfs-arm64/rootfs` | Kali Rolling arm64 base rootfs (desktop + Kali toolset), pinned by `rootfs.manifest` | `tools/build-liuqin-kali-base.sh` then `tools/build-liuqin-kali-rootfs.sh manifest` | Kali apt (default mirror `mirrors.aliyun.com/kali`) |
 | `tools/local/aosp-mkbootimg/` | AOSP `mkbootimg.py` + `unpack_bootimg.py` (commit `954bc3ea`) | `tools/fetch-aosp-mkbootimg.sh` | `android.googlesource.com` (or a local AOSP tree) |
 | `tools/local/busybox-arm64/usr/bin/busybox` | static AArch64 busybox, sha256 `52151e7f322f…` | `tools/fetch-busybox-arm64.sh` | Kali `busybox-static_1.36.1-11_arm64.deb` (or a local copy) |
 | `tools/local/roms/liuqin/OS2.0.203.0.VMYCNXM/` | curated ROM extract: 14 DTBs, 44 DTBOs, 59 sensor config, factory registry (119 files) | `tools/prepare-rom.sh` | a stock fastboot ROM + the vendor/persist partition images |
@@ -37,8 +37,9 @@ rootfs, the busybox deb, and the AOSP mkbootimg archive.
 ## Repreparing (recommended order)
 
 All commands run from the repository root. The network artifacts (#1–#3) have
-two paths because `android.googlesource.com`, `archive.kali.org` and
-`kali.download` are unreliable behind the GFW.
+two paths because `android.googlesource.com` and `archive.kali.org` are
+unreliable behind the GFW. The Kali base defaults to the Aliyun mirror
+(`mirrors.aliyun.com/kali`) for the same reason; override with `KALI_MIRROR`.
 
 ### 1. AOSP mkbootimg
 ```sh
@@ -64,15 +65,21 @@ Check: `sha256sum tools/local/busybox-arm64/usr/bin/busybox`
 
 ### 3. Kali base rootfs
 ```sh
-# normal network (fill the placeholder first, see below):
-sudo tools/build-liuqin-kali-rootfs.sh extract
-# GFW / offline — place the already-extracted tree:
-#   tools/local/kali-rootfs-arm64/rootfs   (verify against rootfs.manifest)
+# debootstrap the arm64 base, then install the GNOME desktop + Kali toolset:
+sudo tools/build-liuqin-kali-base.sh all
+# emit the tree manifest that pins the resulting rootfs:
+sudo tools/build-liuqin-kali-rootfs.sh manifest
 ```
-The extracted tree is pinned by `tools/local/kali-rootfs-arm64/rootfs.manifest`
-(path, mode, owner). The tarball source is
-`https://kali.download/kali-images/kali-2026.01/kali-linux-rolling-main-default_arm64-rootfs.tar.gz`
-(2 147 483 648 bytes).
+The base is debootstrapped from the Kali repository (default mirror
+`http://mirrors.aliyun.com/kali`, override with `KALI_MIRROR`) and installs
+`kali-desktop-gnome` + `kali-linux-default` plus the tablet's default toolset
+(vim, EasyEffects, the ALSA + PipeWire stack as the default sound server, a
+full zsh setup, and an Android-like font set). Run as root so device-node and
+ownership fidelity survive. The resulting tree is pinned by
+`tools/local/kali-rootfs-arm64/rootfs.manifest` (path, mode, owner, sha256),
+which `build-liuqin-native-root.sh` and `build-liuqin-settings.py` verify
+before use. Re-running `build-liuqin-kali-base.sh` is idempotent: each stage is
+skipped when its marker (`base.installed`) is present.
 
 ### 4. Stock-ROM extract (DTB / DTBO / sensor config / registry)
 ```sh
@@ -118,14 +125,12 @@ and populates `tools/local/apt-cache-kali-rolling-arm64`.
 
 ## Placeholder hashes (download path only)
 
-Two sha256 pins are left as placeholders so the fetch scripts stay honest:
+One sha256 pin is left as a placeholder so the fetch script stays honest:
 
-- `tools/build-liuqin-kali-rootfs.sh` → `tarball_sha256` (sha256 of the pinned
-  Kali rootfs tarball).
 - `tools/fetch-busybox-arm64.sh` → `package_sha256` (sha256 of the pinned
   `busybox-static_1.36.1-11_arm64.deb`).
 
-To use the download path, download each artifact once and replace the
+To use the download path, download the artifact once and replace the
 `PLACEHOLDER_…` with its `sha256sum`. The *binary* pins are already set:
 busybox `52151e7f322f…`, AOSP `mkbootimg.py` `37d84b3d…`. The offline/copy path
 needs none of these.

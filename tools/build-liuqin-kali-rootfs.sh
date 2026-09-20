@@ -1,61 +1,27 @@
 #!/bin/sh
 # SPDX-License-Identifier: MIT
 #
-# Extract the Kali Linux Rolling arm64 rootfs from the pinned tarball.
+# Emit the tree manifest for the Kali Linux Rolling arm64 base rootfs.
 #
-# Two stages, each independently gated:
-#   1. verify the tarball byte identity (size + sha256);
-#   2. extract base and emit a tree manifest (path, mode, owner, sha256)
-#      for comparison and pinning.
+# The base itself is debootstrapped by tools/build-liuqin-kali-base.sh (the
+# project no longer mirrors a pinned tarball).  This script only fingerprints
+# the resulting tree so build-liuqin-native-root.sh and build-liuqin-settings.py
+# can pin and verify it.  The manifest records, per path: type, mode, owner,
+# and (for regular files) sha256.
 #
-# Stage 2 needs real root so device nodes, ownership and xattrs survive.  Run
-# it as:  sudo tools/build-liuqin-kali-rootfs.sh extract
+# The manifest pass needs real root so root-owned, unreadable files (e.g. apt
+# lists partial/) are seen in full; any find or sha256 failure is fatal -- a
+# truncated manifest is a false identity, worse than none.  Run as:
+#
+#   sudo sh tools/build-liuqin-kali-base.sh all
+#   sudo sh tools/build-liuqin-kali-rootfs.sh manifest
 set -eu
 
 project_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 input_dir=${KALI_ROOT_INPUT:-"$project_root/tools/local/kali-rootfs-arm64"}
-tarball=$input_dir/kali-rootfs-arm64.tar.gz
-tarball_url=${KALI_ROOTFS_URL:-https://kali.download/kali-images/kali-2026.01/kali-linux-rolling-main-default_arm64-rootfs.tar.gz}
-tarball_bytes=2147483648
-tarball_sha256=PLACEHOLDER_KALI_ROOTFS_SHA256
 rootfs=${KALI_ROOT_ROOTFS:-"$input_dir/rootfs"}
 
 die() { printf 'build-liuqin-kali-rootfs: %s\n' "$*" >&2; exit 1; }
-
-verify_tarball() {
-	[ -f "$tarball" ] || die "Tarball is unavailable: $tarball (re-download from https://kali.download/)"
-	[ "$(stat -c %s "$tarball")" = "$tarball_bytes" ] || die "Tarball size differs from $tarball_bytes"
-	printf '%s  %s\n' "$tarball_sha256" "$tarball" | sha256sum -c --quiet - ||
-		die 'Tarball sha256 mismatch; do not use this file'
-}
-
-download_tarball() {
-	mkdir -p "$input_dir"
-	exec 9>"$input_dir/.download.lock"
-	flock -n 9 || die 'another tarball download owns this input directory'
-	if [ -f "$tarball" ]; then
-		verify_tarball
-		printf 'Using cached Kali rootfs tarball\n'
-		return
-	fi
-	command -v curl >/dev/null || die 'curl is required'
-	# A mirror override must supply the same pinned bytes, never a different release.
-	curl --fail --location --continue-at - --output "$tarball.part" "$tarball_url"
-	[ "$(stat -c %s "$tarball.part")" = "$tarball_bytes" ] || die 'downloaded tarball size mismatch'
-	printf '%s  %s\n' "$tarball_sha256" "$tarball.part" | sha256sum -c --quiet - ||
-		die 'downloaded tarball hash mismatch; remove the .part file before retrying'
-	mv "$tarball.part" "$tarball"
-	printf 'Kali rootfs tarball downloaded and verified\n'
-}
-
-extract_rootfs() {
-	[ "$(id -u)" = 0 ] || die "stage 2 must run as real root (sudo $0 extract)"
-	[ -f "$tarball" ] || download_tarball
-	verify_tarball
-	[ ! -e "$rootfs" ] || die "refusing to overwrite an existing rootfs: $rootfs"
-	tar -xzf "$tarball" -C "$rootfs" --numeric-owner --same-owner
-	write_manifest
-}
 
 write_manifest() {
 	# The tree is root-owned with unreadable directories (e.g. apt lists
@@ -63,6 +29,14 @@ write_manifest() {
 	# and treat any find failure as fatal -- a truncated manifest is a false
 	# identity, worse than none.
 	[ "$(id -u)" = 0 ] || die "manifest stage must run as real root (sudo $0 manifest)"
+	# No host filesystem may be mounted into the tree (e.g. a leaked /sys or
+	# /dev from build-liuqin-kali-base.sh), or host state pollutes the
+	# fingerprint.  Fail loudly instead of pinning a tree that includes it.
+	for leak in proc sys dev dev/pts dev/shm; do
+		if mountpoint -q "$rootfs/$leak" 2>/dev/null; then
+			die "rootfs/$leak is mounted; unmount host filesystems before manifesting"
+		fi
+	done
 	manifest=${KALI_ROOTFS_MANIFEST:-"$input_dir/rootfs.manifest"}
 	tmp=$manifest.tmp
 	paths=$manifest.paths.tmp
@@ -91,9 +65,6 @@ write_manifest() {
 }
 
 case ${1:-} in
-download) download_tarball ;;
-verify-tarball) verify_tarball; printf 'Tarball verified: %s bytes, %s\n' "$tarball_bytes" "$tarball_sha256" ;;
-extract) extract_rootfs ;;
 manifest) [ -d "$rootfs" ] || die "rootfs is unavailable: $rootfs"; write_manifest ;;
-*) die 'usage: build-liuqin-kali-rootfs.sh download|verify-tarball|extract|manifest' ;;
+*) die 'usage: build-liuqin-kali-rootfs.sh manifest' ;;
 esac

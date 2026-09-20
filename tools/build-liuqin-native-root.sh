@@ -30,7 +30,7 @@ project_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 out_dir=${OUT_DIR:-"$project_root/out/native-root"}
 desktop_root=${KALI_ROOT_ROOTFS:-"$project_root/tools/local/kali-rootfs-arm64/rootfs"}
 desktop_manifest=${KALI_ROOTFS_MANIFEST:-"$desktop_root.manifest"}
-desktop_manifest_sha256=d0f45d9fbea0b69c4f7af3f940b6f8af27723f9646653211accf053b05ba5566
+desktop_manifest_sha256=af44786cd49329a87f937714f006fd30252597f8c49f53aa5d535078c8c8cf3e
 debs_dir=${DEBS_DIR:-"$project_root/out/liuqin-debs"}
 # Shared with test-liuqin-debs.sh: the archive indexes are downloaded once per
 # host, not once per runner, and the shipped tree keeps the pinned (empty)
@@ -99,6 +99,7 @@ rm -f /etc/resolv.conf
 cp -L /etc/resolv.conf.test /etc/resolv.conf
 # APT hooks are lists; scalar command-line overrides do not clear them.
 cat >/tmp/liuqin-apt.conf <<'APT'
+Acquire::ForceIPv4 "true";
 #clear APT::Update::Post-Invoke-Success;
 #clear APT::Update::Post-Invoke;
 #clear DPkg::Post-Invoke;
@@ -138,18 +139,42 @@ apt-get -c /tmp/liuqin-apt.conf install -y --no-install-recommends \
 	gnome-calendar gnome-clocks gnome-characters gnome-remote-desktop \
 	gnome-font-viewer gnome-disk-utility gnome-logs simple-scan \
 	power-profiles-daemon >/dev/null
-# System locale: en_US.UTF-8 (user request). Generate the locale data for the
-# arm64 target inside the chroot and pin it as the default.
-grep -q '^en_US.UTF-8 UTF-8' /etc/locale.gen ||
-	printf 'en_US.UTF-8 UTF-8\n' >>/etc/locale.gen
-locale-gen en_US.UTF-8 >/dev/null
-if ! locale -a 2>/dev/null | grep -qi 'en_US.utf8'; then
-	echo 'en_US.utf8 locale was not generated' >&2
-	exit 1
-fi
+# System locales (user request): en_US, zh_CN, ja_JP. Generate the locale
+# data for the arm64 target inside the chroot; en_US stays the default and the
+# other two are available to select in GNOME.
+for loc in en_US.UTF-8 zh_CN.UTF-8 ja_JP.UTF-8; do
+	grep -q "^$loc UTF-8" /etc/locale.gen || printf '%s UTF-8\n' "$loc" >>/etc/locale.gen
+done
+locale-gen >/dev/null
+for loc in en_US.utf8 zh_CN.utf8 ja_JP.utf8; do
+	locale -a 2>/dev/null | grep -qi "$loc" || { echo "$loc locale was not generated" >&2; exit 1; }
+done
 printf 'LANG=en_US.UTF-8\n' >/etc/default/locale
 grep -q '^LANG=en_US.UTF-8' /etc/environment ||
 	printf 'LANG=en_US.UTF-8\n' >>/etc/environment
+# Root shell: zsh with the Kali extras (autosuggestions + syntax highlighting)
+# and a sane prompt/history set, matching the x86 Kali setup.
+usermod -s /usr/bin/zsh root
+[ -f /root/.zshrc ] || cat >/root/.zshrc <<'ZSHRC'
+# liuqin root zsh: Kali system rc + the two extras, plus sensible defaults.
+zmodload zsh/complist
+autoload -Uz compinit && compinit -u
+zstyle ':completion:*' menu select
+zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'
+bindkey '^I' complete-word
+[ -f /etc/zsh/zshrc ] && . /etc/zsh/zshrc
+[ -f /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh ] &&
+	source /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh
+[ -f /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ] &&
+	source /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+setopt autocd interactivecomments histignorealldups
+HISTFILE=~/.zsh_history
+HISTSIZE=5000
+SAVEHIST=5000
+PROMPT='%F{cyan}%n@%m%f %F{green}%~%f %F{red}%#%f '
+ZSHRC
+chown 0:0 /root/.zshrc
+chmod 0644 /root/.zshrc
 # Root SSH login: rewrite the distro default (per user request).
 if grep -qE '^[#]?[[:space:]]*PermitRootLogin' /etc/ssh/sshd_config; then
 	sed -ri 's/^[#]?[[:space:]]*PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config
@@ -225,10 +250,10 @@ END {
 	mv "$bluez_tmp" "$bluez_conf"
 	grep -qx 'AutoEnable=true' "$bluez_conf" || die 'BlueZ AutoEnable edit did not land'
 
-	# --- unit enablement (native set; snap admission deliberately not required) --
-	# basic.target.requires carries the storage guard only: the snap admission
-	# text check must not gate basic.target (exit-list item).  snap-admission's
-	# unit still ships with liuqin-device-support for on-demand --verify.
+	# --- unit enablement (native set) ------------------------------------------
+	# basic.target.requires carries the storage guard only.  The Kali base ships
+	# no snapd, so the snap-root-admission unit is not part of the device layer
+	# and must not gate basic.target (exit-list item).
 	link_unit() { # link_unit <wants/requires dir> <unit>
 		mkdir -p "$root/etc/systemd/system/$1"
 		ln -sfn "../$2" "$root/etc/systemd/system/$1/$2"
@@ -278,7 +303,7 @@ END {
 		die 'ucm.conf identity mismatch'
 	tree_sha=$(cd "$audio_src/firmware-cirrus" && find . -type f | LC_ALL=C sort |
 		xargs sha256sum | sha256sum | cut -d' ' -f1)
-	[ "$tree_sha" = 1e59e0b3597f3151f1234fa9a478f2ca194aff81fc9c13ac36108080aa7e590e ] ||
+	[ "$tree_sha" = 668aaf11d5bcdf357416b33a2c41f9681a0c4b0c87ea306970488512dcd1622a ] ||
 		die 'cirrus firmware tree identity mismatch'
 	install -d -m 0755 -o 0 -g 0 "$root/usr/share/alsa/ucm2"
 	install -m 0644 -o 0 -g 0 "$audio_src/ucm.conf" "$root/usr/share/alsa/ucm2/ucm.conf"
@@ -287,7 +312,7 @@ END {
 	chown -R 0:0 "$root/usr/lib/firmware/cirrus"
 	find "$root/usr/lib/firmware/cirrus" -type d -exec chmod 0755 {} +
 	find "$root/usr/lib/firmware/cirrus" -type f -exec chmod 0644 {} +
-	[ "$(find "$root/usr/lib/firmware/cirrus" -type f | wc -l | tr -d ' ')" = 637 ] ||
+	[ "$(find "$root/usr/lib/firmware/cirrus" -type f | wc -l | tr -d ' ')" = 642 ] ||
 		die 'cirrus firmware file count mismatch'
 
 	# --- SSC sensor stack policy (static overlay) -----------------------------
@@ -470,17 +495,6 @@ LIUQIN_MYSWAP_UNIT
 	if [ -f "$root/usr/lib/systemd/system/power-profiles-daemon.service" ]; then
 		ln -sfn /usr/lib/systemd/system/power-profiles-daemon.service \
 			"$root/etc/systemd/system/graphical.target.wants/power-profiles-daemon.service"
-	fi
-
-	# --- malcontent SONAME (reviewed Settings closure) ------------------------
-	# The patched Settings build links malcontent 0.14 symbols absent from the
-	# Kali 0.13 build; the 0.14 library is a symbol superset, so point the
-	# shared SONAME at it for every consumer (Settings, the diverted distro
-	# binary, gnome-initial-setup).
-	malcontent=$root/usr/lib/aarch64-linux-gnu
-	if [ -f "$malcontent/libmalcontent-0.so.0.14.0" ]; then
-		ln -sfn libmalcontent-0.so.0.14.0 "$malcontent/libmalcontent-0.so.0"
-		chown 0:0 "$malcontent/libmalcontent-0.so.0"
 	fi
 
 	# --- Wi-Fi radio policy (reference parity) --------------------------------

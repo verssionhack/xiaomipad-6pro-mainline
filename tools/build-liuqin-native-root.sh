@@ -106,6 +106,12 @@ Acquire::ForceIPv4 "true";
 APT
 apt-get -c /tmp/liuqin-apt.conf update >/dev/null
 apt-get -c /tmp/liuqin-apt.conf install -y --no-install-recommends libqrtr1 libprotobuf-c1 >/dev/null
+
+# Fast-dev mode: skip apt-get installs of the Kali toolset, GNOME stack, and
+# locales.  These are only needed for the release image; the initramfs, kernel
+# modules, liuqin debs, and charger-mode files are always installed.  Set
+# LIUQIN_BUILD_DEV=1 to build a minimal rootfs quickly for iteration.
+if [ "${LIUQIN_BUILD_DEV:-}" != 1 ]; then
 # Tablet defaults: SSH access, the classic net tools, the supplicant Network
 # Manager needs to associate on Wi-Fi, the usual network debug utilities, the
 # locales tools (debootstrap ships only C.utf8; the tablet needs en_US), and the
@@ -152,6 +158,7 @@ done
 printf 'LANG=en_US.UTF-8\n' >/etc/default/locale
 grep -q '^LANG=en_US.UTF-8' /etc/environment ||
 	printf 'LANG=en_US.UTF-8\n' >>/etc/environment
+fi
 # Root shell: zsh with the Kali extras (autosuggestions + syntax highlighting)
 # and a sane prompt/history set, matching the x86 Kali setup.
 usermod -s /usr/bin/zsh root

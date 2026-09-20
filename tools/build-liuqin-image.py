@@ -137,12 +137,17 @@ def main():
             (destination / 'SHA256SUMS').write_text(''.join(f'{h}  {n}\n' for n, h in hashes.items()))
             continue
         script, arguments, destination = stages[stage]
-        print('Stage: ' + stage, flush=True)
+        print('=== [' + str(selected.index(stage) + 1) + '/' + str(len(selected)) + '] Stage: ' + stage + ' (' + script + ') ===', flush=True)
         stage_env = dict(env, OUT_DIR=str(destination))
         if stage == 'installer':
             stage_env['INSTALLER_RUNTIME'] = str(out / 'installer-runtime')
-        subprocess.run(['python3' if script.endswith('.py') else 'sh',
-                        str(project / 'tools' / script), *arguments], env=stage_env, check=True)
+        try:
+            subprocess.run(['python3' if script.endswith('.py') else 'sh',
+                            str(project / 'tools' / script), *arguments], env=stage_env, check=True)
+        except subprocess.CalledProcessError as e:
+            print('!!! Stage ' + stage + ' FAILED (exit ' + str(e.returncode) + '); see above for details', flush=True)
+            raise
+        print('+++ Stage ' + stage + ' completed +++', flush=True)
     print('Selected assembly stages completed; device validation is separate')
 
 

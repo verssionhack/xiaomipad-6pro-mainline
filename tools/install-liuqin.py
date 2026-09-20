@@ -40,7 +40,8 @@ def command(address, text, timeout=60, on_progress=None):
         buffer = bytearray()
         deadline = time.monotonic() + timeout
         pattern = re.compile(rb'(?:^|\n)' + end.encode() + rb' ([0-9]+)\r?\n')
-        progress_pattern = re.compile(rb'^liuqin-install: (.+)$', re.MULTILINE)
+        progress_pattern = re.compile(rb'\nliuqin-install: (.+)$')
+        _progress_last_end = 0  # offset in buffer of last progress match
         while time.monotonic() < deadline:
             try:
                 chunk = connection.recv(65536)
@@ -49,12 +50,13 @@ def command(address, text, timeout=60, on_progress=None):
             if not chunk:
                 break
             buffer.extend(chunk)
-            # Extract and display progress messages from the full buffer.
+            # Extract new progress messages only (scan from last position).
             if on_progress:
-                for m in progress_pattern.finditer(buffer):
+                for m in progress_pattern.finditer(buffer, _progress_last_end):
                     msg = m.group(1).decode(errors='replace').strip()
                     if msg:
                         on_progress(msg)
+                    _progress_last_end = m.end()
             # Backup output can be large; the terminator is always at the tail.
             match = pattern.search(buffer, max(0, len(buffer) - 512))
             if match:

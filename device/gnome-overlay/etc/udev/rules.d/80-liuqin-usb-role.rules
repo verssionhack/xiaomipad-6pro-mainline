@@ -1,0 +1,15 @@
+# Rebind the rescue gadget when the ADSP returns the USB-C port to peripheral
+# mode.
+#
+# The role is owned by UCSI, which re-asserts it only on attach and detach, and
+# the DWC3 UDC is torn down for the duration of host mode.  configfs does not
+# rebind the gadget when the UDC comes back, so without this a PC attached after
+# the port has been used as a host would find an empty peripheral: no NCM link,
+# no 192.168.7.2.
+#
+# usb_role_switch_set_role() raises KOBJ_CHANGE on the switch whenever the role
+# changes, which is the only notification this state produces.  The rebind has
+# to wait for the controller to re-register the UDC, far longer than a udev RUN
+# window should ever hold, so the work is delegated to systemd and udev only
+# schedules the oneshot.
+ACTION=="change", SUBSYSTEM=="usb_role", ATTR{role}=="device", TAG+="systemd", ENV{SYSTEMD_WANTS}+="liuqin-usb-gadget.service"

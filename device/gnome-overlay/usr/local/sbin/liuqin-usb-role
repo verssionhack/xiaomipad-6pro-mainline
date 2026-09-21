@@ -1,0 +1,139 @@
+#!/bin/sh
+# SPDX-License-Identifier: MIT
+#
+# Force the USB-C port role, or rebind the rescue gadget after the port has been
+# handed back to peripheral mode.
+#
+# The role is owned by the ADSP.  pmic-glink reports the connector state and
+# usb/typec/ucsi pushes the resulting role onto the DWC3 role switch, but only
+# on attach and detach -- nothing re-asserts it in between.  That is what makes
+# a role written here survive as an override until the next plug event, and it
+# is also why forcing a role is a debugging/product decision rather than a
+# configuration: the ADSP takes the port back the moment the cable moves.
+#
+# "none" is deliberately rejected.  DWC3 maps every role other than host and
+# device onto role-switch-default-mode, and this board's DTS sets no default, so
+# the controller would quietly read it as peripheral instead of releasing the
+# port.  Only host and device do what they say.
+#
+# Peripheral mode is only useful with the gadget attached.  initramfs/init
+# builds the configfs gadget and binds the UDC, but the UDC is torn down for the
+# duration of host mode and configfs never rebinds on its own.  `bind` is what
+# the udev rule schedules when UCSI returns the port to peripheral mode, and
+# `device` runs it too so the helper still works where udev is not watching.
+set -eu
+
+role_glob=${LIUQIN_USB_ROLE_GLOB:-/sys/class/usb_role/*/role}
+udc_glob=${LIUQIN_USB_UDC_GLOB:-/sys/class/udc/*}
+gadget=${LIUQIN_USB_GADGET:-/sys/kernel/config/usb_gadget/liuqin}
+wait_seconds=${LIUQIN_USB_UDC_WAIT_SECONDS:-10}
+
+say() { printf '%s\n' "liuqin-usb-role: $*"; }
+die() { printf '%s\n' "liuqin-usb-role: $*" >&2; exit 1; }
+
+case $wait_seconds in ''|*[!0-9]*) die "invalid wait limit: $wait_seconds";; esac
+
+find_role_switch()
+{
+	for role_path in $role_glob; do
+		[ -w "$role_path" ] || continue
+		printf '%s\n' "$role_path"
+		return 0
+	done
+	return 1
+}
+
+find_udc()
+{
+	for udc_path in $udc_glob; do
+		[ -e "$udc_path" ] || continue
+		basename "$udc_path"
+		return 0
+	done
+	return 1
+}
+
+# DWC3 answers a read of the role from current_dr_role, which it updates on a
+# workqueue after the mode change, so the attribute lags the change itself by a
+# few milliseconds.  Only read it where that lag has had time to pass.
+current_role()
+{
+	role_switch=$(find_role_switch) || return 1
+	cat "$role_switch" 2>/dev/null || return 1
+}
+
+# The controller re-registers the UDC a moment after the mode change, so wait
+# for it rather than racing it -- but bound the wait, because a port that is not
+# really peripheral must not park a udev-scheduled oneshot here.
+await_udc()
+{
+	udc_elapsed=0
+	while :; do
+		if udc_name=$(find_udc); then
+			return 0
+		fi
+		[ "$udc_elapsed" -lt "$wait_seconds" ] || return 1
+		sleep 1
+		udc_elapsed=$((udc_elapsed + 1))
+	done
+}
+
+bind_gadget()
+{
+	[ -d "$gadget" ] || die "the rescue gadget is absent: $gadget"
+	if [ -n "$(cat "$gadget/UDC" 2>/dev/null || :)" ]; then
+		say 'rescue gadget is already bound'
+		return 0
+	fi
+	if ! await_udc; then
+		# A uevent carries no role of its own: udev matches the role
+		# attribute, and that attribute lags the transition away from
+		# peripheral.  A port on its way to host can therefore look
+		# peripheral for the moment it is read, and this script gets asked
+		# to bind a gadget for a port that is leaving.  Where the port
+		# settled, long after the event, is what tells the two apart.
+		if settled=$(current_role) && [ "$settled" != device ]; then
+			say "the port settled on $settled; nothing to bind"
+			return 0
+		fi
+		die "the controller registered no UDC within ${wait_seconds}s"
+	fi
+	# The udev rule and the `device` verb can arrive together whenever the role
+	# is forced by hand.  Whoever loses that race finds the gadget bound by the
+	# winner, and that is success, not a conflict -- configfs answers the second
+	# write with EBUSY.
+	if [ -n "$(cat "$gadget/UDC" 2>/dev/null || :)" ]; then
+		say 'rescue gadget is already bound'
+		return 0
+	fi
+	if ! printf '%s\n' "$udc_name" >"$gadget/UDC" 2>/dev/null; then
+		[ -n "$(cat "$gadget/UDC" 2>/dev/null || :)" ] ||
+			die "could not bind the rescue gadget to $udc_name"
+	fi
+	say "rescue gadget bound to $udc_name"
+}
+
+set_role()
+{
+	role_switch=$(find_role_switch) || die 'no writable USB role switch is present'
+	printf '%s\n' "$1" >"$role_switch" || die "the controller refused the $1 role"
+	say "port role forced to $1"
+}
+
+case ${1:-} in
+host)
+	# Host mode needs nothing bound: DWC3 tears the UDC down itself, which
+	# unbinds the gadget in turn.
+	set_role host
+	;;
+device)
+	set_role device
+	bind_gadget
+	;;
+bind)
+	bind_gadget
+	;;
+*)
+	die 'usage: liuqin-usb-role host|device|bind'
+	;;
+esac

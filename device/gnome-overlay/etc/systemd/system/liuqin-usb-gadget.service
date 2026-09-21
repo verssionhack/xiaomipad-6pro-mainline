@@ -1,0 +1,19 @@
+[Unit]
+Description=liuqin USB rescue gadget rebind
+# Scheduled by 80-liuqin-usb-role.rules when the ADSP returns the port to
+# peripheral mode.
+#
+# initramfs/init builds the configfs gadget and binds the UDC, but the UDC is
+# torn down for the duration of host mode and configfs never rebinds by itself.
+# Without this unit a PC attached after the port has once been a host would find
+# an empty peripheral and no 192.168.7.0/24 rescue link, which also leaves
+# liuqin-gnome-usb-rescue.service with no usb0 to configure.
+#
+# The unit is skipped when the gadget is absent, so a kernel without the
+# interface the initramfs expects installs cleanly.
+ConditionPathExists=/sys/kernel/config/usb_gadget/liuqin
+After=sys-kernel-config.mount
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/liuqin-usb-role bind

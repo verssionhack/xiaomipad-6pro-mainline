@@ -1,0 +1,14 @@
+[org/gnome/settings-daemon/plugins/housekeeping]
+# gsd-housekeeping raises a "Support GNOME" notification from
+# gsd-donation-reminder.c once its recorded timestamp lapses, offering
+# https://donate.gnome.org/ and the line "GNOME needs your help. Your donation
+# will sustain our open source project for future generations."
+#
+# That is a request addressed to people who chose a GNOME distribution, where
+# donating is how they support the desktop they picked.  This image is a fixed,
+# vendor-provisioned desktop for one tablet, so the solicitation has no
+# audience here -- it reads only as the system asking its owner for money.
+#
+# The reminder is gated on this key and not on a build-time option, so turning
+# it off is configuration rather than a patch to gnome-settings-daemon.
+donation-reminder-enabled=false

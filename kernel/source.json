@@ -1,9 +1,9 @@
 {
   "repo": "https://github.com/yzddmr6/linux-sm8450-liuqin.git",
-  "branch": "liuqin-6.17",
+  "branch": "usb_test",
   "upstream_url": "https://github.com/sm8450-mainline/linux.git",
   "upstream_base": "a19585977c11fa662435b607cb9ff4ac7133092e",
-  "commit": "a974a62a45c5d3ebf1d121eb909db963f7e3c4aa",
+  "commit": "87f74dc6df759e4c4688d70e7d86c0061a01edd5",
   "config_sha256": "3e9a68f3004239334299c28331599e5d97f0f43e8ae823895adbbdf053d4c5b9",
   "config_fragments": [
     "device/configs/liuqin-firstboot.config",

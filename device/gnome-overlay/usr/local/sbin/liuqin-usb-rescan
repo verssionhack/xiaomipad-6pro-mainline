@@ -1,0 +1,37 @@
+#!/bin/sh
+# SPDX-License-Identifier: MIT
+#
+# Force the internal Genesys Logic hub (05e3:0610) to rescan its ports by
+# unbinding and rebinding its hub driver.
+#
+# The hub occasionally misses a plug event and leaves a freshly connected
+# device unenumerated.  Rebinding the hub interface forces a full port
+# rescan, so whatever is physically present gets enumerated.
+#
+# This is a manual tool, deliberately not an automatic udev RUN: the rebind
+# re-adds every device under the hub, so a rule that rescan-triggers on those
+# add events would retrigger itself and rebind the hub in a loop.
+set -eu
+
+say() { printf '%s\n' "liuqin-usb-rescan: $*"; }
+die() { printf '%s\n' "liuqin-usb-rescan: $*" >&2; exit 1; }
+
+# Identify the hub by vendor/product, not by port position.
+hub=
+for dev in /sys/bus/usb/devices/*/; do
+	[ -r "$dev/idVendor" ] || continue
+	[ "$(cat "$dev/idVendor")" = 05e3 ] || continue
+	[ "$(cat "$dev/idProduct")" = 0610 ] || continue
+	hub=$(basename "${dev%/}")
+	break
+done
+[ -n "$hub" ] || die 'the Genesys hub (05e3:0610) is not enumerated'
+[ -d /sys/bus/usb/drivers/hub ] || die 'the hub driver is unavailable'
+
+iface="$hub:1.0"
+[ -e "/sys/bus/usb/devices/$iface" ] || die "the hub interface $iface is absent"
+
+say "rebinding $iface to rescan the hub ports"
+printf '%s\n' "$iface" >/sys/bus/usb/drivers/hub/unbind
+printf '%s\n' "$iface" >/sys/bus/usb/drivers/hub/bind
+say 'port rescan complete'

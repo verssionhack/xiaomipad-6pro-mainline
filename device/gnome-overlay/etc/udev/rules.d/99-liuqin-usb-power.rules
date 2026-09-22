@@ -1,0 +1,5 @@
+# Keep the internal Genesys hub and its downstream devices (Bluetooth,
+# touchscreen) out of autosuspend: a suspended hub drops its ports and
+# silently loses plug events.
+ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="05e3", ATTR{idProduct}=="0610", ATTR{power/control}="on"
+ACTION=="add", SUBSYSTEM=="usb", DEVPATH=="*/usb1/1-1*", ATTR{power/control}="on"

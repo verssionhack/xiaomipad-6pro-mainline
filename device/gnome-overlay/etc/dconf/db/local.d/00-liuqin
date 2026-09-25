@@ -46,3 +46,13 @@ sleep-inactive-battery-type='nothing'
 # account. With its empty password this is a screen shield, not an authentication
 # boundary; setting a real password remains a separate product gate.
 lock-enabled=true
+
+[org/gnome/geoclue]
+# Disable the default location service; the tablet does not have a GPS and
+# GNSS hardware, so coarse WiFi-based location is not useful as a default.
+allow=boolean false
+
+[org/gnome/system-monitor]
+# Show swap usage in the hardware monitoring graph; swap is a first-class
+# resource on a device with limited RAM and needs to be visible at a glance.
+show-swap=true

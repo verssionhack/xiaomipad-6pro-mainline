@@ -14,6 +14,7 @@ jobs=${JOBS:-$(getconf _NPROCESSORS_ONLN)}
 objcopy=${OBJCOPY:-${cross}objcopy}
 rebuild_modules=${REBUILD_MODULES:-0}
 expected_commit=${KERNEL_COMMIT:-}
+allow_kernel_override=${LIUQIN_ALLOW_KERNEL_OVERRIDE:-0}
 canonical_prefix=${KBUILD_CANONICAL_PREFIX:-}
 
 die() { echo "build-liuqin-kernel-modules: $*" >&2; exit 1; }
@@ -23,10 +24,17 @@ case $dest in "$project"/out/*|/tmp/*) ;; *) die 'OUT_DIR must be below out/ or 
 command -v "$objcopy" >/dev/null || die "objcopy is unavailable: $objcopy"
 
 case $rebuild_modules in 0|1) ;; *) die 'REBUILD_MODULES must be 0 or 1' ;; esac
+case $allow_kernel_override in 0|1) ;; *) die 'LIUQIN_ALLOW_KERNEL_OVERRIDE must be 0 or 1' ;; esac
 commit=$(git -C "$kernel" rev-parse HEAD) || die 'kernel source commit is unavailable'
 case $commit in *[!0-9a-f]*|'') die 'unsafe kernel commit identity' ;; esac
+# A development kernel comes from a tree that need not sit on the pinned commit.
+# The mismatch is still reported; --allow-kernel-override downgrades it from a
+# refusal to a notice so the matching module tree can still be produced.
 if [ -n "$expected_commit" ] && [ "$commit" != "$expected_commit" ]; then
-	die "kernel source commit differs: $commit != $expected_commit"
+	[ "$allow_kernel_override" = 1 ] ||
+		die "kernel source commit differs: $commit != $expected_commit"
+	printf 'build-liuqin-kernel-modules: overriding the product commit pin (%s != %s)\n' \
+		"$commit" "$expected_commit" >&2
 fi
 [ -f "$out/include/config/kernel.release" ] || die 'generated kernel release is unavailable'
 release=$(cat "$out/include/config/kernel.release")

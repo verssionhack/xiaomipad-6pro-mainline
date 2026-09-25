@@ -29,6 +29,10 @@ def main():
     parser.add_argument('--jobs', type=int, default=min(os.cpu_count() or 1, 12))
     parser.add_argument('--configure-only', action='store_true')
     parser.add_argument('--revision', help='Exact development SHA; does not update the product lock')
+    parser.add_argument('--allow-kernel-override', action='store_true',
+                        help='Build the source tree as it stands, at any commit and with '
+                             'uncommitted changes.  The output is a development build, and every '
+                             'downstream stage needs the same override to accept it.')
     args = parser.parse_args()
     if args.jobs < 1:
         parser.error('--jobs must be positive')
@@ -39,12 +43,19 @@ def main():
         if not re.fullmatch(r'[0-9a-f]{40}', args.revision):
             parser.error('--revision must be a full commit SHA')
         lock['commit'] = args.revision
+    source_head = output('git', '-C', str(source), 'rev-parse', 'HEAD')
+    if args.allow_kernel_override:
+        # Build whatever the tree holds and record that commit, so the artifact
+        # identity describes the kernel that was produced rather than the product
+        # pin.  product_kernel_commit below still carries the pinned commit.
+        lock['commit'] = source_head
     if out == source or source in out.parents:
         parser.error('--out must be outside the kernel source tree')
-    if output('git', '-C', str(source), 'rev-parse', 'HEAD') != lock['commit']:
-        parser.error('kernel source does not match kernel/source.json')
-    if output('git', '-C', str(source), 'status', '--porcelain', '--untracked-files=normal'):
-        parser.error('kernel source must be clean')
+    if not args.allow_kernel_override:
+        if source_head != lock['commit']:
+            parser.error('kernel source does not match kernel/source.json')
+        if output('git', '-C', str(source), 'status', '--porcelain', '--untracked-files=normal'):
+            parser.error('kernel source must be clean')
     cross = os.environ.get('CROSS_COMPILE', 'aarch64-linux-gnu-')
     compiler = shutil.which(cross + 'gcc')
     if not compiler:
@@ -102,8 +113,10 @@ def main():
                                'Image', lock['dtb'], 'modules'], env=env, check=True)
         subprocess.run(make + ['modules_install', 'INSTALL_MOD_PATH=' + str(out / 'modules')],
                        env=env, check=True)
-        if output('git', '-C', str(source), 'rev-parse', 'HEAD') != lock['commit'] or output(
-                'git', '-C', str(source), 'status', '--porcelain', '--untracked-files=normal'):
+        if not args.allow_kernel_override and (
+                output('git', '-C', str(source), 'rev-parse', 'HEAD') != lock['commit'] or
+                output('git', '-C', str(source), 'status', '--porcelain',
+                       '--untracked-files=normal')):
             identity['invalidated'] = 'source changed during build'
             stamp.write_text(json.dumps(identity, indent=2) + '\n')
             parser.error('source changed during build; discard this output')
@@ -113,7 +126,8 @@ def main():
                        ('commit', 'config_sha256', 'fragments', 'compiler_sha256',
                         'compiler_version', 'builder_sha256')}
         public_info.update(product_kernel_commit=pinned_commit,
-                           build_kind='development' if args.revision else 'product-input')
+                           build_kind='development' if (args.revision or args.allow_kernel_override)
+                           else 'product-input')
         (out / 'build-info.json').write_text(json.dumps(public_info, indent=2) + '\n')
         paths.append('build-info.json')
         (out / 'SHA256SUMS').write_text(''.join(f'{digest(out / p)}  {p}\n' for p in paths))

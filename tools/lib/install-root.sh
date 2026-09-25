@@ -117,12 +117,19 @@ fi
 	die 'xattrs not preserved in extracted rootfs'
 progress "boot contract verification"
 # Verify immutable boot-contract files after extraction and provisioning.
-tail -n +2 /etc/liuqin-native-root.contract | while read -r expected path; do
-	[ -n "$expected" ] || continue
-	actual=$(/bin/busybox sha256sum "/mnt/install/native-root$path" | /bin/busybox cut -d' ' -f1)
-	[ "$actual" = "$expected" ] || die "root contract mismatch: $path"
-done
-progress "boot contract verified"
+# A kernel assembled with --allow-kernel-override has a marker baked into this
+# initramfs.  The contract is derived from the product lock, so it cannot match a
+# test kernel, and that difference is accepted deliberately in that case.
+if [ -e /etc/liuqin-allow-kernel-override ]; then
+	progress "kernel override marker present; boot contract check skipped"
+else
+	tail -n +2 /etc/liuqin-native-root.contract | while read -r expected path; do
+		[ -n "$expected" ] || continue
+		actual=$(/bin/busybox sha256sum "/mnt/install/native-root$path" | /bin/busybox cut -d' ' -f1)
+		[ "$actual" = "$expected" ] || die "root contract mismatch: $path"
+	done
+	progress "boot contract verified"
+fi
 cleanup
 trap - EXIT HUP INT TERM
 printf 'liuqin-install: ROOT_INSTALLED\n'

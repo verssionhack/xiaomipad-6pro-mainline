@@ -32,6 +32,10 @@ def main():
                                           'pack', 'bundle', 'release-assets'], default='all')
     parser.add_argument('--device-tested', action='store_true',
                         help='Mark release assets after completing device installation tests')
+    parser.add_argument('--allow-kernel-override', action='store_true',
+                        help='Assemble a development kernel and bake the matching marker into '
+                             'the initramfs so the device-side contracts accept it.  Without '
+                             'this, a kernel whose build-info is not a product input is refused.')
     args = parser.parse_args()
     if args.device_tested and args.stage != 'release-assets':
         parser.error('--device-tested is only valid with --stage release-assets')
@@ -49,7 +53,12 @@ def main():
         parser.error('--out must be inside the project out directory')
     lock = json.loads((project / 'kernel/source.json').read_text())
     info = json.loads((kernel / 'build-info.json').read_text())
-    if info['commit'] != lock['commit'] or info.get('build_kind') != 'product-input':
+    # A development override is admitted only when it is asked for explicitly, and
+    # the same intent is then baked into the initramfs for the device-side checks.
+    if args.allow_kernel_override:
+        lock['commit'] = info['commit']
+    if info['commit'] != lock['commit'] or (
+            not args.allow_kernel_override and info.get('build_kind') != 'product-input'):
         parser.error('Kernel build must match the product lock, not a development override')
     if info['config_sha256'] != lock['config_sha256']:
         parser.error('Kernel configuration does not match the product lock')
@@ -59,7 +68,8 @@ def main():
     env.update(GIT_CONFIG_COUNT='2', GIT_CONFIG_KEY_0='safe.directory',
                GIT_CONFIG_VALUE_0=str(project), GIT_CONFIG_KEY_1='safe.directory',
                GIT_CONFIG_VALUE_1=str(project.parent / 'linux-sm8450-liuqin'))
-    env.update(supplied, KERNEL_SOURCE=str(project.parent / 'linux-sm8450-liuqin'),
+    env.update(supplied, LIUQIN_ALLOW_KERNEL_OVERRIDE='1' if args.allow_kernel_override else '0',
+               KERNEL_SOURCE=str(project.parent / 'linux-sm8450-liuqin'),
                KERNEL_DIR=str(project.parent / 'linux-sm8450-liuqin'), KERNEL_COMMIT=lock['commit'],
                KERNEL_OUT=str(kernel), KERNEL_IMAGE=str(kernel / 'arch/arm64/boot/Image'),
                KERNEL_DTB=str(kernel / 'arch/arm64/boot/dts' / lock['dtb']),
@@ -121,7 +131,10 @@ def main():
             hashes = {}
             for name, source in files.items():
                 if name in ('boot.img', 'installer.img', 'rootfs.tar.gz'):
-                    os.link(source, destination / name)
+                    # Relative, so the bundle stays valid wherever it is moved to.
+                    # release-assets dereferences these when it materialises the
+                    # published copy, so nothing ships as a link.
+                    os.symlink(os.path.relpath(source, destination), destination / name)
                 else:
                     shutil.copyfile(source, destination / name)
                 with source.open('rb') as stream:

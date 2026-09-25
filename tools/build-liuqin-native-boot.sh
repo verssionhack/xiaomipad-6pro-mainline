@@ -14,6 +14,7 @@ wlan_tuple=${WLAN_HSP2_TUPLE:?"set WLAN_HSP2_TUPLE to the prepared WLAN tuple"}
 stock_overlay_dir=${STOCK_OVERLAY_DIR:?"set STOCK_OVERLAY_DIR to the extracted stock DTBO entries"}
 stock_base_dir=${STOCK_BASE_DIR:?"set STOCK_BASE_DIR to the extracted stock vendor_boot DTBs"}
 mk_dir=${MKBOOTIMG_DIR:-"$project_root/tools/local/aosp-mkbootimg"}
+allow_kernel_override=${LIUQIN_ALLOW_KERNEL_OVERRIDE:-0}
 slot_cc=${SLOT_SUCCESS_GCC:-aarch64-linux-gnu-gcc}
 dtc=$kernel_out/scripts/dtc/dtc
 fdtoverlay=$kernel_out/scripts/dtc/fdtoverlay
@@ -23,6 +24,8 @@ cmdline=$(cat "$project_root/device/native-bootargs.txt")
 
 die() { printf 'build-liuqin-native-boot: %s\n' "$*" >&2; exit 1; }
 sha() { sha256sum "$1" | cut -d' ' -f1; }
+
+case $allow_kernel_override in 0|1) ;; *) die 'LIUQIN_ALLOW_KERNEL_OVERRIDE must be 0 or 1' ;; esac
 
 case $out_dir in
 "$project_root"/out/*) ;;
@@ -40,23 +43,32 @@ done
 [ "$(sha "$mk_dir/mkbootimg.py")" = 37d84b3d162e0bc62e36c1f4e1c63c85ea0caa9f29be023eb2f8efe006ad948c ] ||
 	die 'mkbootimg.py identity mismatch'
 
-python3 - "$project_root/kernel/source.json" "$kernel_source" "$kernel_out" "$native_root_hashes" <<'PY'
+python3 - "$project_root/kernel/source.json" "$kernel_source" "$kernel_out" "$native_root_hashes" \
+	"$allow_kernel_override" <<'PY'
 import hashlib, json, subprocess, sys
 from pathlib import Path
 lock = json.loads(Path(sys.argv[1]).read_text())
-source, out, manifest = map(Path, sys.argv[2:])
+source, out, manifest = map(Path, sys.argv[2:5])
+override = sys.argv[5] == '1'
 commit = subprocess.check_output(['git', '-C', str(source), 'rev-parse', 'HEAD'], text=True).strip()
+if override:
+    # A development kernel is built from whatever the tree holds, so the product
+    # pin and the worktree state are informational rather than binding.
+    lock['commit'] = commit
 if commit != lock['commit']:
     raise SystemExit('kernel source does not match kernel/source.json')
-if subprocess.check_output(['git', '-C', str(source), 'status', '--porcelain']):
+if not override and subprocess.check_output(['git', '-C', str(source), 'status', '--porcelain']):
     raise SystemExit('kernel source is dirty')
 if hashlib.sha256((out / '.config').read_bytes()).hexdigest() != lock['config_sha256']:
     raise SystemExit('kernel configuration differs from kernel/source.json')
+# The root filesystem carries the kernel release it was assembled against; a
+# development kernel changes that string, which is what --allow-kernel-override
+# is for.  Under the product lock the two must still agree.
 release = (out / 'include/config/kernel.release').read_bytes()
 wanted = hashlib.sha256(release).hexdigest()
 rows = [line.split('  ', 1) for line in manifest.read_text().splitlines()]
 matches = [h for h, p in rows if p == '/usr/share/liuqin/kernel.release']
-if matches != [wanted]:
+if not override and matches != [wanted]:
     raise SystemExit('root filesystem and kernel release do not match')
 PY
 source_epoch=$(git -C "$kernel_source" show -s --format=%ct HEAD)

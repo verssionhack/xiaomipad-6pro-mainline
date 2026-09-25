@@ -95,6 +95,7 @@ root_profile=${LIUQIN_ROOT_PROFILE:-legacy}
 gnome_root_contract=${GNOME_ROOT_CONTRACT:-"$project_root/device/rootfs-artifacts/gnome-root.contract"}
 native_root_contract=${NATIVE_ROOT_CONTRACT:-}
 native_root_manifest=${NATIVE_ROOT_MANIFEST:-"$project_root/out/native-root/native-root.hashes"}
+allow_kernel_override=${LIUQIN_ALLOW_KERNEL_OVERRIDE:-0}
 case $storage_mode in
 readonly|persistent) ;;
 *)
@@ -106,6 +107,13 @@ case $embed_rootfs in
 0|1) ;;
 *)
 	echo "error: LIUQIN_EMBED_ROOTFS must be 0 or 1, not: $embed_rootfs" >&2
+	exit 1
+	;;
+esac
+case $allow_kernel_override in
+0|1) ;;
+*)
+	echo "error: LIUQIN_ALLOW_KERNEL_OVERRIDE must be 0 or 1, not: $allow_kernel_override" >&2
 	exit 1
 	;;
 esac
@@ -579,6 +587,16 @@ if [ -n "${INSTALLER_RUNTIME:-}" ]; then
 	chmod 0644 "$staging/etc/liuqin-storage-mode" "$staging/etc/liuqin-installer"
 	# GNU tar invokes gzip externally; do not depend on ash's applet dispatch.
 	ln -s busybox "$staging/bin/gzip"
+fi
+
+# A development kernel is not the one the product lock names, and the device-side
+# contracts are derived from that lock, so a test boot would be refused on the
+# tablet.  Record the override in the image itself: a flag cannot be typed on the
+# device, and both initramfs/init and install-root.sh need to recognise the case.
+if [ "$allow_kernel_override" = 1 ]; then
+	mkdir -p "$staging/etc"
+	printf '1\n' >"$staging/etc/liuqin-allow-kernel-override"
+	chmod 0644 "$staging/etc/liuqin-allow-kernel-override"
 fi
 
 find "$staging" -exec touch -h -d "@$source_epoch" {} +

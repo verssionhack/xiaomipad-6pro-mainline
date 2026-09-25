@@ -100,10 +100,19 @@ cp -L /etc/resolv.conf.test /etc/resolv.conf
 # APT hooks are lists; scalar command-line overrides do not clear them.
 cat >/tmp/liuqin-apt.conf <<'APT'
 Acquire::ForceIPv4 "true";
+Acquire::Parallel-Downloads "16";
 #clear APT::Update::Post-Invoke-Success;
 #clear APT::Update::Post-Invoke;
 #clear DPkg::Post-Invoke;
 APT
+# Google Chrome is only distributed through Google's own APT repository, not
+# the Kali mirrors; fetch its signing key and register the repository before
+# the update so google-chrome-stable resolves during the installs below.
+install -d /usr/share/keyrings
+curl -fsSL https://dl.google.com/linux/linux_signing_key.pub \
+	| gpg --dearmor > /usr/share/keyrings/google-linux.gpg
+echo 'deb [signed-by=/usr/share/keyrings/google-linux.gpg] http://dl.google.com/linux/chrome/deb stable main' \
+	>/etc/apt/sources.list.d/google-chrome.list
 apt-get -c /tmp/liuqin-apt.conf update >/dev/null
 apt-get -c /tmp/liuqin-apt.conf install -y --no-install-recommends libqrtr1 libprotobuf-c1 >/dev/null
 
@@ -144,7 +153,7 @@ apt-get -c /tmp/liuqin-apt.conf install -y --no-install-recommends \
 apt-get -c /tmp/liuqin-apt.conf install -y --no-install-recommends \
 	gnome-calendar gnome-clocks gnome-characters gnome-remote-desktop \
 	gnome-font-viewer gnome-disk-utility gnome-logs simple-scan \
-	power-profiles-daemon >/dev/null
+	power-profiles-daemon google-chrome-stable >/dev/null
 # System locales (user request): en_US, zh_CN, ja_JP. Generate the locale
 # data for the arm64 target inside the chroot; en_US stays the default and the
 # other two are available to select in GNOME.

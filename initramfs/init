@@ -105,6 +105,15 @@ if [ "${LIUQIN_INIT_STORAGE_TEST_ONLY:-0}" = 1 ]; then
 	storage_gnome_contract=${LIUQIN_STORAGE_GNOME_CONTRACT:-$storage_gnome_contract}
 	storage_native_contract=${LIUQIN_STORAGE_NATIVE_CONTRACT:-$storage_native_contract}
 fi
+# A development kernel is not the one the product lock names, and these contracts
+# are derived from that lock, so none of them can match a test boot.  The build
+# that admitted the override records it in this image
+# (see tools/lib/build-initramfs.sh), because no flag can be typed on the tablet.
+allow_kernel_override_marker=${LIUQIN_ALLOW_KERNEL_OVERRIDE_MARKER:-/etc/liuqin-allow-kernel-override}
+allow_kernel_override=0
+if [ -e "$allow_kernel_override_marker" ]; then
+	allow_kernel_override=1
+fi
 storage_rcs_expected_sha256=
 storage_inittab_expected_sha256=
 storage_busybox_expected_sha256=
@@ -497,6 +506,10 @@ storage_native_root_ok() {
 
 storage_root_ok() {
 	storage_checked_root=$1
+	if [ "$allow_kernel_override" = 1 ]; then
+		log "kernel override marker present: accepting a root that does not match the product contract"
+		return 0
+	fi
 	if [ "$storage_profile" = native ]; then
 		storage_native_root_ok "$storage_checked_root"
 		return $?
